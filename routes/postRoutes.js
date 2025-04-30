@@ -2,32 +2,42 @@ const express = require("express");
 const router = express.Router();
 const Post = require("../models/Post");
 const authMiddleware = require("../middleware/authMiddleware");
+const User = require("../models/User");
 
-// ✅ GET all posts
+// Get all posts with author info
 router.get("/", async (req, res) => {
-  try {
-    const posts = await Post.find().sort({ createdAt: -1 });
-    res.json(posts);
-  } catch (error) {
-    console.error("❌ Error fetching posts:", error.message);
-    res.status(500).json({ message: "Server error" });
-  }
+  const posts = await Post.find().populate("author", "name profilePic").sort({ createdAt: -1 });
+  res.json(posts);
 });
 
-// ✅ POST create a post
+// Create post
 router.post("/", authMiddleware, async (req, res) => {
-  try {
-    const { content } = req.body;
-    const newPost = new Post({
-      user: req.user.id,
-      content,
-    });
-    await newPost.save();
-    res.status(201).json(newPost);
-  } catch (error) {
-    console.error("❌ Error creating post:", error.message);
-    res.status(500).json({ message: "Server error" });
+  const post = new Post({ content: req.body.content, author: req.user.id });
+  await post.save();
+  res.status(201).json(post);
+});
+
+// Like/unlike
+router.patch("/:id/like", authMiddleware, async (req, res) => {
+  const post = await Post.findById(req.params.id);
+  const userId = req.user.id;
+
+  if (post.likes.includes(userId)) {
+    post.likes.pull(userId);
+  } else {
+    post.likes.push(userId);
   }
+
+  await post.save();
+  res.json({ likes: post.likes.length });
+});
+
+// Add comment
+router.post("/:id/comment", authMiddleware, async (req, res) => {
+  const post = await Post.findById(req.params.id);
+  post.comments.push({ user: req.user.id, text: req.body.text });
+  await post.save();
+  res.json(post.comments);
 });
 
 module.exports = router;

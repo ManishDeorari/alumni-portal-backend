@@ -45,4 +45,14 @@ router.put("/update", authMiddleware, async (req, res) => {
   }
 });
 
+// 👇 Add this at the bottom
+router.get("/:id", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch profile" });
+  }
+});
+
 module.exports = router;
