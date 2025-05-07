@@ -122,4 +122,39 @@ router.get("/:id", authMiddleware, async (req, res) => {
   }
 });
 
+// PATCH /api/user/points/add
+router.patch("/points/add", authMiddleware, async (req, res) => {
+  const { amount } = req.body;
+  try {
+    const user = await User.findById(req.user.id);
+
+    const currentYear = new Date().getFullYear();
+    if (user.lastResetYear < currentYear) {
+      user.points = 0;
+      user.lastResetYear = currentYear;
+    }
+
+    user.points += amount;
+    await user.save();
+    res.json({ points: user.points });
+  } catch (error) {
+    console.error("Error updating points:", error.message);
+    res.status(500).json({ message: "Failed to update points" });
+  }
+});
+
+// GET /api/user/award-eligible
+router.get("/award-eligible", authMiddleware, async (req, res) => {
+  try {
+    const eligibleUsers = await User.find({ "points.total": { $gte: 80 } })
+      .select("-password")
+      .sort({ "points.total": -1 });
+
+    res.json(eligibleUsers);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching eligible users" });
+  }
+});
+
+
 module.exports = router;

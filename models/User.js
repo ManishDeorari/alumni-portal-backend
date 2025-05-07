@@ -1,5 +1,16 @@
 const mongoose = require("mongoose");
 
+const PointsSchema = new mongoose.Schema({
+  profileCompletion: { type: Number, default: 0 },
+  studentEngagement: { type: Number, default: 0 },
+  referrals: { type: Number, default: 0 },
+  contentContribution: { type: Number, default: 0 },
+  campusEngagement: { type: Number, default: 0 },
+  innovationSupport: { type: Number, default: 0 },
+  alumniParticipation: { type: Number, default: 0 },
+  total: { type: Number, default: 0 }
+});
+
 const UserSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
@@ -14,6 +25,8 @@ const UserSchema = new mongoose.Schema({
   connections: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   pendingRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   sentRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  points: { type: PointsSchema, default: () => ({}) },
+  role: { type: String, enum: ["user", "admin"], default: "user" }
 });
 
 module.exports = mongoose.model("User", UserSchema);

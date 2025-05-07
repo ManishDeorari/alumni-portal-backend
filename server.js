@@ -6,12 +6,15 @@ const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const postRoutes = require("./routes/postRoutes");
+const pendingRoute = require("./routes/connect/pending");
+const adminPointsRoutes = require("./routes/adminPointsRoutes");
 
 const app = express();
 
 // Middleware
 app.use(express.json());
 app.use(cors());
+
 
 // Connect to MongoDB
 connectDB();
@@ -25,6 +28,8 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/connect/pending", pendingRoute);
+app.use("/api/admin", adminPointsRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
