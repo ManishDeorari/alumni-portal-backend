@@ -1,34 +1,63 @@
-// backend/src/api/posts/route.js
-
 const express = require("express");
+const multer = require("multer");
+const { v2: cloudinary } = require("cloudinary");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const Post = require("../../../models/Post");
 const authMiddleware = require("../../../middleware/authMiddleware");
 
 const router = express.Router();
 
-// Get all posts
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Multer + Cloudinary Storage
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "posts",
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+  },
+});
+
+const upload = multer({ storage });
+
+// GET all posts
 router.get("/", async (req, res) => {
   try {
-    const posts = await Post.find().sort({ createdAt: -1 });
+    const posts = await Post.find()
+      .sort({ createdAt: -1 })
+      .populate("author", "fullName profilePic")
+      .populate("comments.user", "fullName profilePic")
+      .populate("likes", "fullName profilePic");
+
     res.json(posts);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch posts" });
   }
 });
 
-// Create a new post
-router.post("/", authMiddleware, async (req, res) => {
+// POST a new post (with optional image)
+router.post("/", authMiddleware, upload.single("image"), async (req, res) => {
   try {
     const { content } = req.body;
     const userId = req.user.id;
+    const imageUrl = req.file?.path || "";
 
     const newPost = new Post({
       content,
       author: userId,
+      image: imageUrl,
     });
 
     await newPost.save();
-    res.status(201).json(newPost);
+    const populated = await Post.findById(newPost._id)
+      .populate("author", "fullName profilePic");
+
+    res.status(201).json(populated);
   } catch (err) {
     console.error("Create Post Error:", err);
     res.status(500).json({ message: "Post creation failed" });
@@ -51,7 +80,10 @@ router.patch("/:id/like", authMiddleware, async (req, res) => {
     }
 
     await post.save();
-    res.json(post);
+    const populated = await Post.findById(post._id)
+      .populate("likes", "fullName profilePic");
+
+    res.json(populated);
   } catch (err) {
     res.status(500).json({ message: "Failed to like post" });
   }
@@ -69,7 +101,10 @@ router.post("/:id/comment", authMiddleware, async (req, res) => {
     post.comments.push({ user: userId, text: comment });
     await post.save();
 
-    res.status(201).json(post);
+    const populated = await Post.findById(post._id)
+      .populate("comments.user", "fullName profilePic");
+
+    res.status(201).json(populated);
   } catch (err) {
     res.status(500).json({ message: "Failed to comment" });
   }
