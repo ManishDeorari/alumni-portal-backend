@@ -8,6 +8,10 @@ const userRoutes = require("./routes/userRoutes");
 const postRoutes = require("./routes/postRoutes");
 const pendingRoute = require("./routes/connect/pending");
 const adminPointsRoutes = require("./routes/adminPointsRoutes");
+const connectRequestRoute = require("./routes/connect/request");
+const connectAcceptRoute = require("./routes/connect/accept");
+const connectRejectRoute = require("./routes/connect/reject");
+const connectListRoute = require("./routes/connect/list");
 
 const app = express();
 
@@ -30,6 +34,10 @@ app.use("/api/user", userRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/connect/pending", pendingRoute);
 app.use("/api/admin", adminPointsRoutes);
+app.use("/api/connect/request", connectRequestRoute);
+app.use("/api/connect/accept", connectAcceptRoute);
+app.use("/api/connect/reject", connectRejectRoute);
+app.use("/api/connect/list", connectListRoute);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
