@@ -21,7 +21,7 @@
     "multer": "^1.4.5-lts.2"
   },
   "engines": {
-    "node": ">=18 <21"
+    "node": "20.x"
   },
   "description": ""
 }
