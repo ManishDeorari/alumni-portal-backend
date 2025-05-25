@@ -29,23 +29,23 @@ router.post("/", authenticate, async (req, res) => {
     const connection = new Connect({ from, to });
     await connection.save();
 
+    // Send notification to recipient
+    const sender = await User.findById(from);
+    await User.findByIdAndUpdate(to, {
+      $push: {
+        notifications: {
+          type: "connect",
+          message: `${sender.name} sent you a connection request`,
+          from: from
+        }
+      }
+    });
+
     res.status(201).json({ message: "Connection request sent successfully" });
   } catch (err) {
     console.error("Send Request Error:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
-const sender = await User.findById(from);
-await User.findByIdAndUpdate(to, {
-  $push: {
-    notifications: {
-      type: "connect",
-      message: `${sender.fullName} sent you a connection request`,
-      from: from
-    }
-  }
-});
-
 
 module.exports = router;
