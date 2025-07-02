@@ -1,65 +1,237 @@
-const Post = require("../../../models/Post");
+const Post = require("../models/Post");
+const User = require("../models/User");
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
 
-exports.getAllPosts = async (req, res) => {
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Multer setup for memory storage (upload buffer)
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+exports.uploadMiddleware = upload.single("image");
+
+// Create Post with optional image upload
+exports.createPost = async (req, res) => {
+  try {
+    let imageUrl = "";
+    if (req.file) {
+      const result = await cloudinary.uploader.upload_stream(
+        { resource_type: "image" },
+        (error, result) => {
+          if (error) throw error;
+          imageUrl = result.secure_url;
+        }
+      );
+
+      // This upload_stream requires stream piping, use alternative below:
+      // Instead use cloudinary.uploader.upload from buffer as below:
+
+      const uploadResult = await cloudinary.uploader.upload_stream({
+        resource_type: "image",
+        folder: "posts",
+      });
+
+      // But better to use upload from buffer like this:
+    }
+
+    if (req.file) {
+      const uploadResult = await cloudinary.uploader.upload(
+        `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
+        { folder: "posts" }
+      );
+      imageUrl = uploadResult.secure_url;
+    }
+
+    const post = new Post({
+      user: req.user._id,
+      content: req.body.content,
+      image: imageUrl || "",
+      likes: [],
+      comments: [],
+      reactions: {}, // Map for emojis
+    });
+
+    await post.save();
+    const populatedPost = await post.populate("user", "name profilePic");
+    res.status(201).json(populatedPost);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create post" });
+  }
+};
+
+// Get all posts
+exports.getPosts = async (req, res) => {
   try {
     const posts = await Post.find()
-      .populate("author", "fullName profilePic")
-      .populate("comments.user", "fullName profilePic")
+      .populate("user", "name profilePic")
+      .populate("comments.user", "name profilePic")
       .sort({ createdAt: -1 });
     res.json(posts);
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch posts" });
+    res.status(500).json({ error: "Failed to get posts" });
   }
 };
 
-exports.createPost = async (req, res) => {
-  try {
-    const { content } = req.body;
-    const userId = req.user.id;
-
-    const newPost = new Post({ content, author: userId });
-    await newPost.save();
-    res.status(201).json(newPost);
-  } catch (err) {
-    console.error("Create Post Error:", err);
-    res.status(500).json({ message: "Post creation failed" });
-  }
-};
-
+// Like or unlike post
 exports.likePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
+    const userId = req.user._id.toString();
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const userId = req.user.id;
-    const alreadyLiked = post.likes.includes(userId);
-
-    if (alreadyLiked) {
-      post.likes.pull(userId);
+    const liked = post.likes.includes(userId);
+    if (liked) {
+      post.likes = post.likes.filter((id) => id !== userId);
     } else {
       post.likes.push(userId);
+      // Notify post owner (if not self)
+      if (post.user.toString() !== userId) {
+        const postOwner = await User.findById(post.user);
+        postOwner.notifications.push({
+          type: "like",
+          message: `${req.user.name} liked your post`,
+          fromUser: req.user._id,
+          createdAt: new Date(),
+          read: false,
+        });
+        await postOwner.save();
+      }
     }
 
     await post.save();
-    res.json(post);
+    const updated = await post
+      .populate("user", "name profilePic")
+      .populate("comments.user", "name profilePic");
+    res.json(updated);
   } catch (err) {
-    res.status(500).json({ message: "Failed to like post" });
+    res.status(500).json({ error: "Failed to like post" });
   }
 };
 
-exports.commentOnPost = async (req, res) => {
+// Add comment to post
+exports.commentPost = async (req, res) => {
   try {
-    const { comment } = req.body;
-    const userId = req.user.id;
+    const { text } = req.body;
+    if (!text || text.trim() === "")
+      return res.status(400).json({ message: "Comment text required" });
 
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    post.comments.push({ user: userId, text: comment });
+    const comment = {
+      user: req.user._id,
+      text,
+      createdAt: new Date(),
+    };
+
+    post.comments.push(comment);
+
+    // Notify post owner (if not self)
+    if (post.user.toString() !== req.user._id.toString()) {
+      const postOwner = await User.findById(post.user);
+      postOwner.notifications.push({
+        type: "comment",
+        message: `${req.user.name} commented on your post`,
+        fromUser: req.user._id,
+        createdAt: new Date(),
+        read: false,
+      });
+      await postOwner.save();
+    }
+
     await post.save();
 
-    res.status(201).json(post);
+    const updated = await post
+      .populate("user", "name profilePic")
+      .populate("comments.user", "name profilePic");
+    res.json(updated);
   } catch (err) {
-    res.status(500).json({ message: "Failed to comment" });
+    res.status(500).json({ error: "Failed to comment on post" });
+  }
+};
+
+// React with emoji to post
+exports.reactToPost = async (req, res) => {
+  try {
+    const { emoji } = req.body;
+    if (!emoji) return res.status(400).json({ message: "Emoji required" });
+
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const userId = req.user._id.toString();
+    if (!post.reactions) post.reactions = {};
+
+    const currentUsers = post.reactions.get(emoji) || [];
+    if (currentUsers.includes(userId)) {
+      post.reactions.set(
+        emoji,
+        currentUsers.filter((id) => id !== userId)
+      );
+    } else {
+      post.reactions.set(emoji, [...currentUsers, userId]);
+    }
+
+    await post.save();
+
+    const updated = await post
+      .populate("user", "name profilePic")
+      .populate("comments.user", "name profilePic");
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to react to post" });
+  }
+};
+
+// Delete post
+exports.deletePost = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post)
+      return res.status(404).json({ message: "Post not found" });
+
+    if (post.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    await post.deleteOne();
+    res.json({ message: "Post deleted" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete post" });
+  }
+};
+
+// Edit post
+exports.editPost = async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content || content.trim() === "") {
+      return res.status(400).json({ message: "Content cannot be empty" });
+    }
+
+    const post = await Post.findById(req.params.id);
+    if (!post)
+      return res.status(404).json({ message: "Post not found" });
+
+    if (post.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    post.content = content;
+    await post.save();
+
+    const updated = await post
+      .populate("user", "name profilePic")
+      .populate("comments.user", "name profilePic");
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update post" });
   }
 };
