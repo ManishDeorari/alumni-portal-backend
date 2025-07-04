@@ -17,10 +17,14 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(cors({
-  origin: "https://alumni-frontend.vercel.app", // or "*"
-  credentials: true,
-}));
+// Replace both with just this:
+app.use(
+  cors({
+    origin: ["http://localhost:3000", "https://alumni-frontend.vercel.app"],
+    credentials: true,
+  })
+);
+
 
 // Connect to MongoDB
 connectDB();
