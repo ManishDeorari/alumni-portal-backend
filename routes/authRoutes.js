@@ -35,19 +35,39 @@ router.post("/signup", async (req, res) => {
 // Login User
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, enrollmentNumber } = req.body;
+
+    if (!email || !password || !enrollmentNumber) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
     const user = await User.findOne({ email });
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    // Check email, password, and enrollment number
+    if (
+      !user ||
+      !(await bcrypt.compare(password, user.password)) ||
+      user.enrollmentNumber !== enrollmentNumber
+    ) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "your_jwt_secret", {
+      expiresIn: "1h",
+    });
 
-    res.json({ token, userId: user._id, email: user.email });
+    res.json({
+      token,
+      userId: user._id,
+      email: user.email,
+      name: user.name,
+      enrollmentNumber: user.enrollmentNumber,
+    });
   } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({ message: "Something went wrong" });
   }
 });
+
 
 module.exports = router;
