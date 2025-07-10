@@ -10,6 +10,7 @@ const postSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   content: { type: String, required: true },
   image: { type: String, default: "" },
+  video: { type: String, default: "" }, // ✅ NEW FIELD
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   comments: [commentSchema],
   reactions: {
@@ -18,5 +19,6 @@ const postSchema = new mongoose.Schema({
     default: {},
   },
 }, { timestamps: true });
+
 
 module.exports = mongoose.model("Post", postSchema);

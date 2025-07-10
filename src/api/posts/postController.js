@@ -20,41 +20,34 @@ exports.uploadMiddleware = upload.single("image");
 exports.createPost = async (req, res) => {
   try {
     let imageUrl = "";
+    let videoUrl = "";
+
     if (req.file) {
-      const result = await cloudinary.uploader.upload_stream(
-        { resource_type: "image" },
-        (error, result) => {
-          if (error) throw error;
-          imageUrl = result.secure_url;
+      const fileType = req.file.mimetype;
+
+      const uploadResult = await cloudinary.uploader.upload(
+        `data:${fileType};base64,${req.file.buffer.toString("base64")}`,
+        {
+          folder: "posts",
+          resource_type: fileType.startsWith("video") ? "video" : "image",
         }
       );
 
-      // This upload_stream requires stream piping, use alternative below:
-      // Instead use cloudinary.uploader.upload from buffer as below:
-
-      const uploadResult = await cloudinary.uploader.upload_stream({
-        resource_type: "image",
-        folder: "posts",
-      });
-
-      // But better to use upload from buffer like this:
-    }
-
-    if (req.file) {
-      const uploadResult = await cloudinary.uploader.upload(
-        `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
-        { folder: "posts" }
-      );
-      imageUrl = uploadResult.secure_url;
+      if (fileType.startsWith("video")) {
+        videoUrl = uploadResult.secure_url;
+      } else {
+        imageUrl = uploadResult.secure_url;
+      }
     }
 
     const post = new Post({
       user: req.user._id,
       content: req.body.content,
-      image: imageUrl || "",
+      image: imageUrl,
+      video: videoUrl,
       likes: [],
       comments: [],
-      reactions: {}, // Map for emojis
+      reactions: {},
     });
 
     await post.save();
