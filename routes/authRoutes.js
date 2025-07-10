@@ -36,19 +36,22 @@ router.post("/signup", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password, enrollmentNumber } = req.body;
-
-    if (!email || !password || !enrollmentNumber) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
+    console.log("🔐 Login attempt:", { email, password, enrollmentNumber });
 
     const user = await User.findOne({ email });
+    if (!user) {
+      console.log("❌ No user found");
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
-    // Check email, password, and enrollment number
-    if (
-      !user ||
-      !(await bcrypt.compare(password, user.password)) ||
-      user.enrollmentNumber !== enrollmentNumber
-    ) {
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
+    if (!isPasswordMatch) {
+      console.log("❌ Password mismatch");
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    if (user.enrollmentNumber !== enrollmentNumber) {
+      console.log("❌ Enrollment number mismatch");
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
