@@ -22,16 +22,18 @@ const allowedOrigins = [
   "https://alumni-portal-frontend-khaki.vercel.app"
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: allowedOrigins,
   credentials: true,
-}));
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"], // ✅ This is required
+};
+
+app.use(cors(corsOptions));
 
 // ✅ Allow preflight requests (OPTIONS) for all routes
-app.options("*", cors({
-  origin: allowedOrigins,
-  credentials: true,
-}));
+app.options("*", cors(corsOptions));
+
 
 // Middleware
 app.use(express.json());
