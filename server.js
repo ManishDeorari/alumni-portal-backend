@@ -15,16 +15,26 @@ const connectListRoute = require("./routes/connect/list");
 
 const app = express();
 
+// ✅ CORS Configuration
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://alumni-frontend.vercel.app",
+  "https://alumni-portal-frontend-khaki.vercel.app"
+];
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
+
+// ✅ Allow preflight requests (OPTIONS) for all routes
+app.options("*", cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
+
 // Middleware
 app.use(express.json());
-// Replace both with just this:
-app.use(
-  cors({
-    origin: ["http://localhost:3000", "https://alumni-frontend.vercel.app"],
-    credentials: true,
-  })
-);
-
 
 // Connect to MongoDB
 connectDB();
