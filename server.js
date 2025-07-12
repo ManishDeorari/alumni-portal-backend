@@ -19,6 +19,10 @@ const app = express();
 const allowedOrigins = [
   "https://alumni-portal-frontend-khaki.vercel.app",
   "https://alumni-frontend.vercel.app",
+  "https://alumni-portal-frontend-git-main-manishdeoraris-projects.vercel.app",
+  "https:alumni-portal-frontend-git-main-manishdeoraris-projects.vercel.app",
+  "https:alumni-portal-frontend-70ml39lrm-manishdeoraris-projects.vercel.app",
+  "https:alumni-portal-frontend-manishdeoraris-projects.vercel.app",
   "http://localhost:3000",
 ];
 
