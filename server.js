@@ -15,7 +15,7 @@ const connectListRoute = require("./routes/connect/list");
 
 const app = express();
 
-// ✅ CORS Configuration (with PATCH method allowed)
+// ✅ CORS Configuration
 const allowedOrigins = [
   "http://localhost:3000",
   "https://alumni-frontend.vercel.app",
@@ -25,15 +25,14 @@ const allowedOrigins = [
 const corsOptions = {
   origin: allowedOrigins,
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // ✅ PATCH added here
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"], // ✅ This is required
 };
 
 app.use(cors(corsOptions));
 
 // ✅ Allow preflight requests (OPTIONS) for all routes
 app.options("*", cors(corsOptions));
-
 
 // Middleware
 app.use(express.json());
