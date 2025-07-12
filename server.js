@@ -17,22 +17,26 @@ const app = express();
 
 // ✅ CORS Configuration
 const allowedOrigins = [
-  "http://localhost:3000",
+  "https://alumni-portal-frontend-khaki.vercel.app",
   "https://alumni-frontend.vercel.app",
-  "https://alumni-portal-frontend-khaki.vercel.app"
+  "http://localhost:3000",
 ];
 
 const corsOptions = {
-  origin: "*",
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"], // ✅ This is required
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
-
-// ✅ Allow preflight requests (OPTIONS) for all routes
-app.options("*", cors(corsOptions));
+app.options("*", cors(corsOptions)); // Preflight
 
 // Middleware
 app.use(express.json());
