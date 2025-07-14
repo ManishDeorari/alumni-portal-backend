@@ -6,34 +6,24 @@ const commentSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-// ✅ Post schema with emoji reaction structure and improvements
-const postSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    content: { type: String, required: true },
-    image: { type: String, default: "" },
-    video: { type: String, default: "" },
-
-    // 👍 Likes (simple list of userIds)
-    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-
-    // 💬 Comments (embedded with user reference)
-    comments: [commentSchema],
-
-    // 😄 Emoji Reactions
-    reactions: {
-      type: Map,
-      of: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-      default: {},
-    },
+const postSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  content: { type: String, required: true },
+  image: { type: String, default: "" },
+  video: { type: String, default: "" },
+  likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  comments: [commentSchema],
+  reactions: {
+    type: Map,
+    of: [mongoose.Schema.Types.ObjectId], // ✅ fixed
+    default: {},
   },
-  { timestamps: true }
-);
+}, { timestamps: true });
 
-// ✅ Optional: Indexing for fast user-specific queries
+// ✅ Optional index
 postSchema.index({ user: 1, createdAt: -1 });
 
-// ✅ Optional: Ensure emoji keys are stored as strings
+// ✅ Ensure string keys in Map
 postSchema.pre("save", function (next) {
   if (this.reactions) {
     for (const [key, value] of this.reactions.entries()) {
