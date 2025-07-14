@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const cloudinary = require("../../../config/cloudinary");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const authMiddleware = require("../../../middleware/authMiddleware");
+const auth = require("../../../middleware/authMiddleware");
 const {
   getAllPosts,
   createPost,
@@ -30,9 +30,9 @@ const upload = multer({ storage });
 
 // Routes
 router.get("/", getAllPosts);
-router.post("/", authMiddleware, upload.single("file"), createPost); // Use 'file' as form field name
-router.patch("/:id/like", authMiddleware, likePost);
-router.post("/:id/comment", authMiddleware, commentPost);
+router.post("/", auth, upload.single("file"), createPost); // Use 'file' as form field name
+router.patch("/:id/like", auth, likePost);
+router.post("/:id/comment", auth, commentPost);
 // ✅ PATCH: Emoji Reaction (Like/Unlike with Emoji)
 router.patch("/:postId/react", auth, reactToPost);
 router.patch("/:id/like", auth, likeHandler);
