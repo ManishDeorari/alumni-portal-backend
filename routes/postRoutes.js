@@ -112,34 +112,26 @@ router.patch("/:id/react", auth, async (req, res) => {
 
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // Ensure reactions is a Map-like object
-    if (!post.reactions) post.reactions = new Map();
-
-    // Ensure this emoji has a valid array
-    let current = post.reactions.get(emoji);
-    if (!Array.isArray(current)) current = [];
-
-    // 💥 Remove user from all previous emoji reactions
-    for (const [key, users] of post.reactions.entries()) {
-      if (Array.isArray(users)) {
-        post.reactions.set(
-          key,
-          users.filter((id) => id.toString() !== userId)
-        );
-      }
+    // Ensure post.reactions is a Map
+    if (!(post.reactions instanceof Map)) {
+      post.reactions = new Map(Object.entries(post.reactions || {}));
     }
+
+    // Remove user from all previous emoji reactions
+    for (const [key, users] of post.reactions.entries()) {
+      post.reactions.set(
+        key,
+        users.filter((id) => id.toString() !== userId)
+      );
+    }
+
+    // Handle add or remove
+    const current = post.reactions.get(emoji) || [];
 
     if (action === "add") {
       if (!current.includes(userId)) {
         post.reactions.set(emoji, [...current, userId]);
-
-        // Optional: add a notification
-        await addNotification(
-          post.user,
-          userId,
-          "reaction",
-          `reacted ${emoji} to your post`
-        );
+        await addNotification(post.user, userId, "reaction", `reacted ${emoji} to your post`);
       }
     } else if (action === "remove") {
       const updatedList = current.filter((id) => id.toString() !== userId);
@@ -154,9 +146,15 @@ router.patch("/:id/react", auth, async (req, res) => {
 
     await post.save();
 
-    const updated = await post
+    let updated = await Post.findById(post._id)
       .populate("user", "name profilePic")
       .populate("comments.user", "name profilePic");
+
+    // ✅ Convert to plain object for safe JSON return
+    updated = updated.toObject();
+    if (updated.reactions instanceof Map) {
+      updated.reactions = Object.fromEntries(updated.reactions);
+    }
 
     res.json(updated);
   } catch (err) {
@@ -164,7 +162,6 @@ router.patch("/:id/react", auth, async (req, res) => {
     res.status(500).json({ message: "Failed to react to post" });
   }
 });
-
 
 // ✏️ Edit post content
 router.patch("/:id", auth, async (req, res) => {

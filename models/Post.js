@@ -24,16 +24,31 @@ const postSchema = new mongoose.Schema({
 postSchema.index({ user: 1, createdAt: -1 });
 
 // ✅ Ensure string keys in Map
+const emojiRegex = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Extended_Pictographic})$/u;
+
 postSchema.pre("save", function (next) {
   if (this.reactions) {
     for (const [key, value] of this.reactions.entries()) {
+      const strKey = String(key);
+      if (!emojiRegex.test(strKey)) {
+        this.reactions.delete(key); // remove non-emoji keys
+        continue;
+      }
       if (typeof key !== "string") {
         this.reactions.delete(key);
-        this.reactions.set(String(key), value);
+        this.reactions.set(strKey, value);
       }
     }
   }
   next();
 });
+
+postSchema.methods.toJSON = function () {
+  const obj = this.toObject();
+  if (obj.reactions instanceof Map) {
+    obj.reactions = Object.fromEntries(obj.reactions);
+  }
+  return obj;
+};
 
 module.exports = mongoose.model("Post", postSchema);
