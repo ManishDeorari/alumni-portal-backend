@@ -103,7 +103,7 @@ router.post("/:id/comment", auth, async (req, res) => {
   }
 });
 
-// 😄 Add or remove emoji reaction
+// 😄 Add or remove emoji reaction 
 router.patch("/:id/react", auth, async (req, res) => {
   try {
     const { emoji, action } = req.body;
@@ -112,29 +112,48 @@ router.patch("/:id/react", auth, async (req, res) => {
 
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const current = post.reactions.get(emoji) || [];
+    // Ensure reactions is a Map-like object
+    if (!post.reactions) post.reactions = new Map();
 
-    // Remove previous reactions from all emojis
+    // Ensure this emoji has a valid array
+    let current = post.reactions.get(emoji);
+    if (!Array.isArray(current)) current = [];
+
+    // 💥 Remove user from all previous emoji reactions
     for (const [key, users] of post.reactions.entries()) {
-      post.reactions.set(
-        key,
-        users.filter((id) => id.toString() !== userId)
-      );
+      if (Array.isArray(users)) {
+        post.reactions.set(
+          key,
+          users.filter((id) => id.toString() !== userId)
+        );
+      }
     }
 
     if (action === "add") {
       if (!current.includes(userId)) {
         post.reactions.set(emoji, [...current, userId]);
-        await addNotification(post.user, userId, "reaction", `reacted ${emoji} to your post`);
+
+        // Optional: add a notification
+        await addNotification(
+          post.user,
+          userId,
+          "reaction",
+          `reacted ${emoji} to your post`
+        );
       }
     } else if (action === "remove") {
-      post.reactions.set(emoji, current.filter((id) => id !== userId));
-      if (post.reactions.get(emoji).length === 0) post.reactions.delete(emoji);
+      const updatedList = current.filter((id) => id.toString() !== userId);
+      if (updatedList.length > 0) {
+        post.reactions.set(emoji, updatedList);
+      } else {
+        post.reactions.delete(emoji);
+      }
     } else {
       return res.status(400).json({ message: "Invalid action" });
     }
 
     await post.save();
+
     const updated = await post
       .populate("user", "name profilePic")
       .populate("comments.user", "name profilePic");
@@ -145,6 +164,7 @@ router.patch("/:id/react", auth, async (req, res) => {
     res.status(500).json({ message: "Failed to react to post" });
   }
 });
+
 
 // ✏️ Edit post content
 router.patch("/:id", auth, async (req, res) => {
