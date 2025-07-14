@@ -35,5 +35,7 @@ router.patch("/:id/like", authMiddleware, likePost);
 router.post("/:id/comment", authMiddleware, commentPost);
 // ✅ PATCH: Emoji Reaction (Like/Unlike with Emoji)
 router.patch("/:postId/react", authMiddleware, reactToPost);
+router.patch("/:id/like", auth, likeHandler);
+router.patch("/:id/react", auth, reactHandler);
 
 module.exports = router;
