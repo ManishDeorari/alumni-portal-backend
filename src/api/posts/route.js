@@ -34,7 +34,7 @@ router.post("/", authMiddleware, upload.single("file"), createPost); // Use 'fil
 router.patch("/:id/like", authMiddleware, likePost);
 router.post("/:id/comment", authMiddleware, commentPost);
 // ✅ PATCH: Emoji Reaction (Like/Unlike with Emoji)
-router.patch("/:postId/react", authMiddleware, reactToPost);
+router.patch("/:postId/react", auth, reactToPost);
 router.patch("/:id/like", auth, likeHandler);
 router.patch("/:id/react", auth, reactHandler);
 
