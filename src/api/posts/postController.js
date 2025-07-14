@@ -83,8 +83,8 @@ exports.likePost = async (req, res) => {
     const updated = await post.populate("user", "name profilePic").populate("comments.user", "name profilePic");
     res.json(updated);
   } catch (err) {
-    console.error("Like error:", err);
-    res.status(500).json({ message: "Like action failed" });
+  console.error("🔥 Like action failed:", err);
+  res.status(500).json({ message: "Like action failed", error: err.message });
   }
 };
 

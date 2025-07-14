@@ -16,7 +16,7 @@ const postSchema = new mongoose.Schema({
   reactions: {
     type: Map,
     of: [mongoose.Schema.Types.ObjectId], // ✅ fixed
-    default: {},
+    default: () => new Map(),
   },
 }, { timestamps: true });
 
