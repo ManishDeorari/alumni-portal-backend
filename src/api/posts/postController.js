@@ -68,6 +68,9 @@ exports.likePost = async (req, res) => {
 
     if (!post) return res.status(404).json({ message: "Post not found" });
 
+    // ✅ Fix: Ensure post.likes is always initialized
+    if (!Array.isArray(post.likes)) post.likes = [];
+
     const liked = post.likes.includes(userId);
     if (liked) {
       post.likes = post.likes.filter((id) => id !== userId);
@@ -80,9 +83,11 @@ exports.likePost = async (req, res) => {
     const updated = await post.populate("user", "name profilePic").populate("comments.user", "name profilePic");
     res.json(updated);
   } catch (err) {
+    console.error("Like error:", err);
     res.status(500).json({ message: "Like action failed" });
   }
 };
+
 
 // 💬 Comment on post
 exports.commentPost = async (req, res) => {
@@ -115,11 +120,20 @@ exports.reactToPost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
+    // ✅ Fix: Ensure post.reactions is a Map
+    if (!post.reactions || typeof post.reactions.get !== 'function') {
+      post.reactions = new Map();
+    }
+
     const currentUsers = post.reactions.get(emoji) || [];
 
     if (action === "remove") {
-      post.reactions.set(emoji, currentUsers.filter((id) => id !== userId));
-      if (post.reactions.get(emoji).length === 0) post.reactions.delete(emoji);
+      const updatedUsers = currentUsers.filter((id) => id !== userId);
+      if (updatedUsers.length > 0) {
+        post.reactions.set(emoji, updatedUsers);
+      } else {
+        post.reactions.delete(emoji);
+      }
     } else if (action === "add") {
       if (!currentUsers.includes(userId)) {
         post.reactions.set(emoji, [...currentUsers, userId]);
@@ -133,6 +147,7 @@ exports.reactToPost = async (req, res) => {
     const updated = await post.populate("user", "name profilePic").populate("comments.user", "name profilePic");
     res.json(updated);
   } catch (err) {
+    console.error("Reaction error:", err);
     res.status(500).json({ message: "Reaction failed" });
   }
 };
