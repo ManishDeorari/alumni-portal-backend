@@ -118,14 +118,18 @@ exports.reactToPost = async (req, res) => {
     const userId = req.user._id.toString();
 
     const post = await Post.findById(req.params.id);
+
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // ✅ Fix: Ensure post.reactions is a Map
-    if (!post.reactions || typeof post.reactions.get !== 'function') {
-      post.reactions = new Map();
+    // ✅ Convert object to Map if needed
+    if (!(post.reactions instanceof Map)) {
+      post.reactions = new Map(Object.entries(post.reactions || {}));
     }
 
-    const currentUsers = post.reactions.get(emoji) || [];
+    // ✅ Always get array safely
+    const currentUsers = Array.isArray(post.reactions.get(emoji))
+      ? post.reactions.get(emoji)
+      : [];
 
     if (action === "remove") {
       const updatedUsers = currentUsers.filter((id) => id !== userId);
@@ -143,12 +147,19 @@ exports.reactToPost = async (req, res) => {
       return res.status(400).json({ message: "Invalid action" });
     }
 
+    // ✅ Convert Map back to plain object for MongoDB
+    post.reactions = Object.fromEntries(post.reactions);
+
     await post.save();
-    const updated = await post.populate("user", "name profilePic").populate("comments.user", "name profilePic");
+
+    const updated = await post
+      .populate("user", "name profilePic")
+      .populate("comments.user", "name profilePic");
+
     res.json(updated);
   } catch (err) {
-    console.error("Reaction error:", err);
-    res.status(500).json({ message: "Reaction failed" });
+  console.error("🔥 Reaction failed:", err);
+  res.status(500).json({ message: "Reaction failed", error: err.message });
   }
 };
 
