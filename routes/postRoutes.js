@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Post = require("../models/Post");
 const User = require("../models/User");
-const authMiddleware = require('../middleware/authMiddleware');
+const auth = require("../middleware/authMiddleware");
 
 // 📌 Utility: Add notification to user
 const addNotification = async (userId, fromUserId, type, message) => {
@@ -133,7 +133,7 @@ router.delete("/:id", auth, async (req, res) => {
   res.json({ message: "Post deleted successfully" });
 });
 
-router.patch('/:postId/react', authMiddleware, async (req, res) => {
+router.patch('/:postId/react', auth, async (req, res) => {
   const { emoji, action } = req.body;
   const userId = req.user.id;
 
