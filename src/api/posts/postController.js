@@ -1,14 +1,7 @@
 const Post = require("../models/Post");
 const User = require("../models/User");
-const cloudinary = require("cloudinary").v2;
+const cloudinary = require("../../../config/cloudinary");
 const multer = require("multer");
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 // Multer setup for memory storage (upload buffer)
 const storage = multer.memoryStorage();
@@ -23,17 +16,13 @@ exports.createPost = async (req, res) => {
     let videoUrl = "";
 
     if (req.file) {
-      const fileType = req.file.mimetype;
+      const isVideo = req.file.mimetype.startsWith("video/");
+      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+        folder: "posts",
+        resource_type: isVideo ? "video" : "image",
+      });
 
-      const uploadResult = await cloudinary.uploader.upload(
-        `data:${fileType};base64,${req.file.buffer.toString("base64")}`,
-        {
-          folder: "posts",
-          resource_type: fileType.startsWith("video") ? "video" : "image",
-        }
-      );
-
-      if (fileType.startsWith("video")) {
+      if (isVideo) {
         videoUrl = uploadResult.secure_url;
       } else {
         imageUrl = uploadResult.secure_url;
@@ -54,7 +43,7 @@ exports.createPost = async (req, res) => {
     const populatedPost = await post.populate("user", "name profilePic");
     res.status(201).json(populatedPost);
   } catch (err) {
-    console.error(err);
+    console.error("Upload error:", err);
     res.status(500).json({ error: "Failed to create post" });
   }
 };

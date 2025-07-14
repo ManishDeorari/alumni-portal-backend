@@ -18,16 +18,24 @@ const addNotification = async (userId, fromUserId, type, message) => {
 };
 
 // 📝 Create post (with optional image)
+// 📝 Create post (with optional image & video)
 router.post("/", auth, async (req, res) => {
+  if (!req.body.content && !req.body.image && !req.body.video) {
+    return res.status(400).json({ message: "Post must contain content or media." });
+  }
+
   const post = new Post({
     user: req.user.id,
     content: req.body.content,
-    image: req.body.image || "", // Image URL from Cloudinary
+    image: req.body.image || "",
+    video: req.body.video || "",
   });
+
   const saved = await post.save();
   const populated = await saved.populate("user", "name profilePic");
   res.json(populated);
 });
+
 
 // 📥 Get all posts
 router.get("/", async (req, res) => {
@@ -123,6 +131,35 @@ router.delete("/:id", auth, async (req, res) => {
 
   await post.deleteOne();
   res.json({ message: "Post deleted successfully" });
+});
+
+router.patch('/:postId/react', authMiddleware, async (req, res) => {
+  const { emoji, action } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const current = post.reactions.get(emoji) || [];
+
+    if (action === "remove") {
+      post.reactions.set(emoji, current.filter((id) => id !== userId));
+      if (post.reactions.get(emoji).length === 0) post.reactions.delete(emoji);
+    } else if (action === "add") {
+      if (!current.includes(userId)) {
+        post.reactions.set(emoji, [...current, userId]);
+      }
+    } else {
+      return res.status(400).json({ message: "Invalid action type" });
+    }
+
+    await post.save();
+    res.json(post);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 module.exports = router;

@@ -1,23 +1,17 @@
 const express = require("express");
 const multer = require("multer");
-const { v2: cloudinary } = require("cloudinary");
+const cloudinary = require("../../../config/cloudinary");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const authMiddleware = require("../../../middleware/authMiddleware");
 const {
   getAllPosts,
   createPost,
   likePost,
+  reactToPost,
   commentOnPost
 } = require("./postController");
 
 const router = express.Router();
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: "djw8l0wxn",
-  api_key: "766141813445555",
-  api_secret: "47bXXvPOrHmD4YBh8KEXcmGRqNs",
-});
 
 // Multer + Cloudinary Storage
 const storage = new CloudinaryStorage({
@@ -36,8 +30,10 @@ const upload = multer({ storage });
 
 // Routes
 router.get("/", getAllPosts);
-router.post("/", authMiddleware, createPost);
+router.post("/", authMiddleware, upload.single("file"), createPost); // Use 'file' as form field name
 router.patch("/:id/like", authMiddleware, likePost);
-router.post("/:id/comment", authMiddleware, commentOnPost);
+router.post("/:id/comment", authMiddleware, commentPost);
+// ✅ PATCH: Emoji Reaction (Like/Unlike with Emoji)
+router.patch("/:postId/react", authMiddleware, reactToPost);
 
 module.exports = router;

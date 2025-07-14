@@ -15,6 +15,10 @@ const connectListRoute = require("./routes/connect/list");
 
 const app = express();
 
+// 🚫 Prevent large payload crashes
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb", parameterLimit: 50000 }));
+
 // ✅ CORS Configuration
 const allowedOrigins = [
   "https://alumni-portal-frontend-khaki.vercel.app",
