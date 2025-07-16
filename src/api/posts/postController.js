@@ -289,7 +289,6 @@ const deletePost = async (req, res) => {
 };
 
 module.exports = {
-  uploadMiddleware,
   createPost,
   getPosts,
   likePost,
