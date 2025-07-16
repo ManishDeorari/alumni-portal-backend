@@ -12,7 +12,7 @@ const {
   commentPost,
   editPost,
   deletePost
-} = require("../api/posts/postController");
+} = require("../src/api/posts/postController");
 
 const router = express.Router();
 
