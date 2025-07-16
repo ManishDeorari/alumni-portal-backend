@@ -1,4 +1,4 @@
-const cloudinary = require('cloudinary').v2;
+const cloudinary = require('cloudinary');
 
 // Load environment variables (ensure dotenv is loaded if not done already)
 const dotenv = require("dotenv");
