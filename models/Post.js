@@ -1,9 +1,16 @@
 const mongoose = require("mongoose");
 
+const replySchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  text: String,
+  createdAt: { type: Date, default: Date.now },
+});
+
 const commentSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   text: String,
   createdAt: { type: Date, default: Date.now },
+  replies: [replySchema], // ✅ Nested replies
 });
 
 const postSchema = new mongoose.Schema({
@@ -12,10 +19,10 @@ const postSchema = new mongoose.Schema({
   image: { type: String, default: "" },
   video: { type: String, default: "" },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-  comments: [commentSchema],
+  comments: [commentSchema], // ✅ Corrected field
   reactions: {
     type: Map,
-    of: [mongoose.Schema.Types.ObjectId], // ✅ fixed
+    of: [mongoose.Schema.Types.ObjectId],
     default: () => new Map(),
   },
 }, { timestamps: true });
@@ -23,7 +30,7 @@ const postSchema = new mongoose.Schema({
 // ✅ Optional index
 postSchema.index({ user: 1, createdAt: -1 });
 
-// ✅ Ensure string keys in Map
+// ✅ Ensure emoji keys only
 const emojiRegex = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Extended_Pictographic})$/u;
 
 postSchema.pre("save", function (next) {

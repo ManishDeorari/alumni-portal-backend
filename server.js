@@ -2,6 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const connectDB = require("./config/db");
 const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -14,10 +16,7 @@ const connectRejectRoute = require("./routes/connect/reject");
 const connectListRoute = require("./routes/connect/list");
 
 const app = express();
-
-// 🚫 Prevent large payload crashes
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb", parameterLimit: 50000 }));
+const server = http.createServer(app);
 
 // ✅ CORS Configuration
 const allowedOrigins = [
@@ -43,21 +42,40 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
+const io = new Server(server, {
+  cors: corsOptions,
+});
+
+// ✅ Inject `io` into every request
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+// ✅ Handle socket events
+io.on("connection", (socket) => {
+  console.log("📡 New socket connection:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("❌ Socket disconnected:", socket.id);
+  });
+});
+
+// ✅ Prevent large payload crashes
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb", parameterLimit: 50000 }));
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // Preflight
+app.options("*", cors(corsOptions));
 
-// Middleware
-app.use(express.json());
-
-// Connect to MongoDB
+// ✅ Connect to MongoDB
 connectDB();
 
-// Health Check Route
+// ✅ Health Check Route
 app.get("/", (req, res) => {
   res.send("✅ API is running...");
 });
 
-// Routes
+// ✅ API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/posts", postRoutes);
@@ -68,12 +86,12 @@ app.use("/api/connect/accept", connectAcceptRoute);
 app.use("/api/connect/reject", connectRejectRoute);
 app.use("/api/connect/list", connectListRoute);
 
-// Global Error Handler
+// ✅ Global Error Handler
 app.use((err, req, res, next) => {
   console.error(err.message);
   res.status(500).json({ message: "Server Error" });
 });
 
-// Start Server
+// ✅ Start Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
