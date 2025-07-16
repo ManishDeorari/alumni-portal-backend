@@ -1,15 +1,13 @@
-// api/posts/postController.js
-
 const Post = require("../../models/Post");
 const User = require("../../models/User");
 const cloudinary = require("../../../config/cloudinary");
 const multer = require("multer");
 const streamifier = require("streamifier");
 
-// ✅ Use memory storage
+// ✅ Use memory storage (buffer)
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
-exports.uploadMiddleware = upload.single("media");
+exports.uploadMiddleware = upload.single("file");
 
 // 🔔 Notify post owner
 const notify = async (targetUserId, fromUserId, type, message) => {
@@ -20,12 +18,12 @@ const notify = async (targetUserId, fromUserId, type, message) => {
     message,
     fromUser: fromUserId,
     createdAt: new Date(),
-    read: false
+    read: false,
   });
   await user.save();
 };
 
-// 📤 Helper to upload file from memory to Cloudinary
+// 📤 Upload file to Cloudinary (image or video)
 const uploadToCloudinary = (buffer, folder, resource_type) => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -42,6 +40,7 @@ const uploadToCloudinary = (buffer, folder, resource_type) => {
 // 🔥 Create a new post
 const createPost = async (req, res) => {
   try {
+    const { caption, content } = req.body;
     let imageUrl = "", videoUrl = "";
 
     if (req.file) {
@@ -57,7 +56,7 @@ const createPost = async (req, res) => {
 
     const post = new Post({
       user: req.user._id,
-      content: req.body.content,
+      content,
       image: imageUrl,
       video: videoUrl,
     });
@@ -66,7 +65,7 @@ const createPost = async (req, res) => {
     const populated = await post.populate("user", "name profilePic");
     res.status(201).json(populated);
   } catch (err) {
-    console.error("Post creation failed:", err);
+    console.error("Post creation failed:", err.message);
     res.status(500).json({ message: "Failed to create post" });
   }
 };
@@ -85,7 +84,7 @@ const getPosts = async (req, res) => {
   }
 };
 
-// 👍 Like/unlike
+// 👍 Like/unlike post
 const likePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -103,7 +102,9 @@ const likePost = async (req, res) => {
     }
 
     await post.save();
-    const updated = await post.populate("user", "name profilePic").populate("comments.user", "name profilePic");
+    const updated = await post
+      .populate("user", "name profilePic")
+      .populate("comments.user", "name profilePic");
     res.json(updated);
   } catch (err) {
     console.error("🔥 Like action failed:", err);
@@ -126,7 +127,9 @@ const commentPost = async (req, res) => {
     await notify(post.user, req.user._id, "comment", `${req.user.name} commented on your post`);
     await post.save();
 
-    const updated = await post.populate("user", "name profilePic").populate("comments.user", "name profilePic");
+    const updated = await post
+      .populate("user", "name profilePic")
+      .populate("comments.user", "name profilePic");
     res.json(updated);
   } catch (err) {
     res.status(500).json({ message: "Comment failed" });
@@ -156,11 +159,11 @@ const replyToComment = async (req, res) => {
 
     await post.save();
 
-    const updated = await post.populate("user", "name profilePic").populate("comments.user replies.user", "name profilePic");
+    const updated = await post
+      .populate("user", "name profilePic")
+      .populate("comments.user replies.user", "name profilePic");
 
-    // 🔁 Emit socket event
     req.io.emit("postUpdated", updated);
-
     res.json(updated);
   } catch (err) {
     console.error("Reply failed:", err);
@@ -184,11 +187,11 @@ const deleteComment = async (req, res) => {
     comment.remove();
     await post.save();
 
-    const updated = await post.populate("user", "name profilePic").populate("comments.user replies.user", "name profilePic");
+    const updated = await post
+      .populate("user", "name profilePic")
+      .populate("comments.user replies.user", "name profilePic");
 
-    // 🔁 Emit socket update
     req.io.emit("postUpdated", updated);
-
     res.json(updated);
   } catch (err) {
     console.error("Delete comment error:", err);
@@ -293,5 +296,7 @@ module.exports = {
   commentPost,
   reactToPost,
   editPost,
-  deletePost
+  deletePost,
+  replyToComment,
+  deleteComment,
 };

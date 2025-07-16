@@ -23,9 +23,9 @@ const allowedOrigins = [
   "https://alumni-portal-frontend-khaki.vercel.app",
   "https://alumni-frontend.vercel.app",
   "https://alumni-portal-frontend-git-main-manishdeoraris-projects.vercel.app",
-  "https:alumni-portal-frontend-git-main-manishdeoraris-projects.vercel.app",
-  "https:alumni-portal-frontend-70ml39lrm-manishdeoraris-projects.vercel.app",
-  "https:alumni-portal-frontend-manishdeoraris-projects.vercel.app",
+  "https://alumni-portal-frontend-git-main-manishdeoraris-projects.vercel.app",
+  "https://alumni-portal-frontend-70ml39lrm-manishdeoraris-projects.vercel.app",
+  "https://alumni-portal-frontend-manishdeoraris-projects.vercel.app",
   "http://localhost:3000",
 ];
 
@@ -46,6 +46,10 @@ const io = new Server(server, {
   cors: corsOptions,
 });
 
+// ✅ Connect to MongoDB
+console.log("📡 Attempting MongoDB connection...");
+connectDB();
+
 // ✅ Inject `io` into every request
 app.use((req, res, next) => {
   req.io = io;
@@ -61,20 +65,19 @@ io.on("connection", (socket) => {
   });
 });
 
+console.log("🟢 Middleware setup...");
 // ✅ Prevent large payload crashes
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb", parameterLimit: 50000 }));
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-// ✅ Connect to MongoDB
-connectDB();
-
 // ✅ Health Check Route
 app.get("/", (req, res) => {
   res.send("✅ API is running...");
 });
 
+console.log("🔁 Route setup...");
 // ✅ API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
