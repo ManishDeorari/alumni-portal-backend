@@ -1,9 +1,7 @@
 const Post = require("../../../models/Post");
 const User = require("../../../models/User");
 const cloudinary = require("../../../config/cloudinary");
-
 const streamifier = require("streamifier");
-
 
 const notify = async (targetUserId, fromUserId, type, message) => {
   if (targetUserId.toString() === fromUserId.toString()) return;
@@ -59,7 +57,10 @@ const createPost = async (req, res) => {
     });
 
     await post.save();
-    const populated = await post.populate("user", "name profilePic");
+
+    const populated = await post
+      .populate("user", "name profilePic");
+
     req.io.emit("postCreated", populated);
     res.status(201).json(populated);
   } catch (err) {
@@ -73,7 +74,9 @@ const getPosts = async (req, res) => {
     const posts = await Post.find()
       .sort({ createdAt: -1 })
       .populate("user", "name profilePic")
-      .populate("comments.user replies.user", "name profilePic");
+      .populate({ path: "comments.user", select: "name profilePic" })
+      .populate({ path: "comments.replies.user", select: "name profilePic" });
+
     res.json(posts);
   } catch (err) {
     console.error("Fetch posts failed:", err);
@@ -98,9 +101,11 @@ const likePost = async (req, res) => {
     }
 
     await post.save();
+
     const updated = await post
       .populate("user", "name profilePic")
-      .populate("comments.user replies.user", "name profilePic");
+      .populate({ path: "comments.user", select: "name profilePic" })
+      .populate({ path: "comments.replies.user", select: "name profilePic" });
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
@@ -125,7 +130,8 @@ const commentPost = async (req, res) => {
 
     const updated = await post
       .populate("user", "name profilePic")
-      .populate("comments.user replies.user", "name profilePic");
+      .populate({ path: "comments.user", select: "name profilePic" })
+      .populate({ path: "comments.replies.user", select: "name profilePic" });
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
@@ -159,7 +165,8 @@ const replyToComment = async (req, res) => {
 
     const updated = await post
       .populate("user", "name profilePic")
-      .populate("comments.user replies.user", "name profilePic");
+      .populate({ path: "comments.user", select: "name profilePic" })
+      .populate({ path: "comments.replies.user", select: "name profilePic" });
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
@@ -186,7 +193,8 @@ const deleteComment = async (req, res) => {
 
     const updated = await post
       .populate("user", "name profilePic")
-      .populate("comments.user replies.user", "name profilePic");
+      .populate({ path: "comments.user", select: "name profilePic" })
+      .populate({ path: "comments.replies.user", select: "name profilePic" });
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
@@ -207,7 +215,6 @@ const reactToPost = async (req, res) => {
       post.reactions = new Map(Object.entries(post.reactions || {}));
     }
 
-    // 🔁 Exclusive Reaction Logic: Remove user from all emojis first
     for (const [key, users] of post.reactions.entries()) {
       post.reactions.set(
         key,
@@ -236,7 +243,8 @@ const reactToPost = async (req, res) => {
 
     const updated = await post
       .populate("user", "name profilePic")
-      .populate("comments.user replies.user", "name profilePic");
+      .populate({ path: "comments.user", select: "name profilePic" })
+      .populate({ path: "comments.replies.user", select: "name profilePic" });
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
@@ -260,7 +268,8 @@ const editPost = async (req, res) => {
 
     const updated = await post
       .populate("user", "name profilePic")
-      .populate("comments.user replies.user", "name profilePic");
+      .populate({ path: "comments.user", select: "name profilePic" })
+      .populate({ path: "comments.replies.user", select: "name profilePic" });
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
