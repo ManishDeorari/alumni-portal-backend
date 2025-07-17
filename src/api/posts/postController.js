@@ -1,12 +1,9 @@
 const Post = require("../../../models/Post");
 const User = require("../../../models/User");
 const cloudinary = require("../../../config/cloudinary");
-const multer = require("multer");
+
 const streamifier = require("streamifier");
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
-exports.uploadMiddleware = upload.single("file");
 
 const notify = async (targetUserId, fromUserId, type, message) => {
   if (targetUserId.toString() === fromUserId.toString()) return;

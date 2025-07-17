@@ -14,7 +14,6 @@ const {
   deleteComment,
   editPost,
   deletePost,
-  uploadMiddleware,
 } = require("../src/api/posts/postController");
 
 const router = express.Router();
@@ -36,9 +35,10 @@ const storage = new CloudinaryStorage({
 // ✅ Define the uploadMiddleware here
 const uploadMiddleware = multer({ storage });
 
+
 // ✅ Routes
 router.get("/", getPosts);
-router.post("/", auth, uploadMiddleware, createPost);
+router.post("/", auth, uploadMiddleware.single("file"), createPost);
 
 router.patch("/:id/like", auth, likePost);
 router.patch("/:id/react", auth, reactToPost);
