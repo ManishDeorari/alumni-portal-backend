@@ -2,6 +2,7 @@ const Post = require("../../../models/Post");
 const User = require("../../../models/User");
 const cloudinary = require("../../../config/cloudinary");
 const streamifier = require("streamifier");
+const uploadToCloudinary = require("../../utils/cloudinaryUpload");
 
 const notify = async (targetUserId, fromUserId, type, message) => {
   if (targetUserId.toString() === fromUserId.toString()) return;
@@ -16,19 +17,6 @@ const notify = async (targetUserId, fromUserId, type, message) => {
   await user.save();
 };
 
-const uploadToCloudinary = (buffer, folder, resource_type) => {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type },
-      (error, result) => {
-        if (result) resolve(result);
-        else reject(error);
-      }
-    );
-    streamifier.createReadStream(buffer).pipe(stream);
-  });
-};
-
 const createPost = async (req, res) => {
   try {
     const { content } = req.body;
@@ -41,33 +29,36 @@ const createPost = async (req, res) => {
         "posts",
         isVideo ? "video" : "image"
       );
+
       if (isVideo) videoUrl = uploadResult.secure_url;
       else imageUrl = uploadResult.secure_url;
     }
 
-    if (!content && !imageUrl && !videoUrl) {
-      return res.status(400).json({ message: "Post must contain content or media." });
+    if (!content?.trim() && !imageUrl && !videoUrl) {
+      return res.status(400).json({ message: "Post must contain text or media." });
     }
 
     const post = new Post({
-      user: req.user._id,
-      content,
+      user: req.user._id || req.user.id,  // ✅ fallback for either field
+      content: content?.trim() || "",
       image: imageUrl,
       video: videoUrl,
     });
 
     await post.save();
 
-    const populated = await post
-      .populate("user", "name profilePic");
+    const populated = await post.populate("user", "name profilePicture");
 
-    req.io.emit("postCreated", populated);
+    // ✅ Emit event for real-time UI update
+    req.io?.emit("postCreated", populated);
+
     res.status(201).json(populated);
   } catch (err) {
-    console.error("Post creation failed:", err);
+    console.error("❌ Post creation failed:", err);
     res.status(500).json({ message: "Failed to create post" });
   }
 };
+
 
 const getPosts = async (req, res) => {
   try {

@@ -125,36 +125,35 @@ router.get("/:id", authMiddleware, async (req, res) => {
 // PATCH /api/user/points/add
 router.patch("/points/add", authMiddleware, async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, category = "total" } = req.body;
     console.log("📩 Incoming PATCH /points/add:", { amount, userId: req.user.id });
 
-    // Check if amount is valid
     if (typeof amount !== "number") {
       return res.status(400).json({ message: "Invalid 'amount' in request body" });
     }
 
     const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (!user.points) {
+      user.points = {};  // initialize if not present
     }
 
-    const currentYear = new Date().getFullYear();
-
-    // Reset points annually if needed
-    if (user.lastResetYear < currentYear) {
-      user.points = 0;
-      user.lastResetYear = currentYear;
+    if (!user.points[category]) {
+      user.points[category] = 0;
     }
 
-    // Ensure points field is initialized
-    if (typeof user.points !== "number") {
-      user.points = 0;
-    }
+    user.points[category] += amount;
 
-    user.points += amount;
+    // Optionally recalculate total if category is not 'total'
+    if (category !== "total") {
+      user.points.total = Object.keys(user.points).reduce((sum, key) => {
+        return key === "total" ? sum : sum + (user.points[key] || 0);
+      }, 0);
+    }
 
     await user.save();
-    console.log(`✅ Points updated for ${user.fullName || user.email}: ${user.points}`);
+    console.log(`✅ Points updated for ${user.name}:`, user.points);
 
     res.json({ message: "Points updated", points: user.points });
   } catch (error) {
@@ -162,7 +161,6 @@ router.patch("/points/add", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Server error while updating points" });
   }
 });
-
 
 // GET /api/user/award-eligible
 router.get("/award-eligible", authMiddleware, async (req, res) => {
