@@ -4,12 +4,10 @@ const cloudinary = require("../../../config/cloudinary");
 const multer = require("multer");
 const streamifier = require("streamifier");
 
-// ✅ Use memory storage (buffer)
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 exports.uploadMiddleware = upload.single("file");
 
-// 🔔 Notify post owner
 const notify = async (targetUserId, fromUserId, type, message) => {
   if (targetUserId.toString() === fromUserId.toString()) return;
   const user = await User.findById(targetUserId);
@@ -23,7 +21,6 @@ const notify = async (targetUserId, fromUserId, type, message) => {
   await user.save();
 };
 
-// 📤 Upload file to Cloudinary (image or video)
 const uploadToCloudinary = (buffer, folder, resource_type) => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -37,7 +34,6 @@ const uploadToCloudinary = (buffer, folder, resource_type) => {
   });
 };
 
-// 🔥 Create a new post
 const createPost = async (req, res) => {
   try {
     const { caption, content } = req.body;
@@ -63,20 +59,20 @@ const createPost = async (req, res) => {
 
     await post.save();
     const populated = await post.populate("user", "name profilePic");
+    req.io.emit("postCreated", populated);
     res.status(201).json(populated);
   } catch (err) {
-    console.error("Post creation failed:", err.message);
+    console.error("Post creation failed:", err);
     res.status(500).json({ message: "Failed to create post" });
   }
 };
 
-// 📥 Get all posts
 const getPosts = async (req, res) => {
   try {
     const posts = await Post.find()
       .sort({ createdAt: -1 })
       .populate("user", "name profilePic")
-      .populate("comments.user", "name profilePic");
+      .populate("comments.user replies.user", "name profilePic");
     res.json(posts);
   } catch (err) {
     console.error(err);
@@ -84,7 +80,6 @@ const getPosts = async (req, res) => {
   }
 };
 
-// 👍 Like/unlike post
 const likePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -104,7 +99,9 @@ const likePost = async (req, res) => {
     await post.save();
     const updated = await post
       .populate("user", "name profilePic")
-      .populate("comments.user", "name profilePic");
+      .populate("comments.user replies.user", "name profilePic");
+    
+    req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
     console.error("🔥 Like action failed:", err);
@@ -112,7 +109,6 @@ const likePost = async (req, res) => {
   }
 };
 
-// 💬 Comment on post
 const commentPost = async (req, res) => {
   try {
     const { text } = req.body;
@@ -123,20 +119,20 @@ const commentPost = async (req, res) => {
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     post.comments.push({ user: req.user._id, text, createdAt: new Date() });
-
     await notify(post.user, req.user._id, "comment", `${req.user.name} commented on your post`);
     await post.save();
 
     const updated = await post
       .populate("user", "name profilePic")
-      .populate("comments.user", "name profilePic");
+      .populate("comments.user replies.user", "name profilePic");
+
+    req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ message: "Comment failed" });
   }
 };
 
-// ➕ Reply to a comment
 const replyToComment = async (req, res) => {
   try {
     const { text } = req.body;
@@ -171,7 +167,6 @@ const replyToComment = async (req, res) => {
   }
 };
 
-// ❌ Delete a comment
 const deleteComment = async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
@@ -199,7 +194,6 @@ const deleteComment = async (req, res) => {
   }
 };
 
-// 😄 React with emoji
 const reactToPost = async (req, res) => {
   try {
     const { emoji, action } = req.body;
@@ -237,8 +231,9 @@ const reactToPost = async (req, res) => {
 
     const updated = await post
       .populate("user", "name profilePic")
-      .populate("comments.user", "name profilePic");
+      .populate("comments.user replies.user", "name profilePic");
 
+    req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
     console.error("🔥 Reaction failed:", err);
@@ -246,7 +241,6 @@ const reactToPost = async (req, res) => {
   }
 };
 
-// ✏️ Edit post
 const editPost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -261,8 +255,9 @@ const editPost = async (req, res) => {
 
     const updated = await post
       .populate("user", "name profilePic")
-      .populate("comments.user", "name profilePic");
+      .populate("comments.user replies.user", "name profilePic");
 
+    req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
     console.error("Edit post error:", err);
@@ -270,7 +265,6 @@ const editPost = async (req, res) => {
   }
 };
 
-// ❌ Delete post
 const deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -281,6 +275,7 @@ const deletePost = async (req, res) => {
     }
 
     await post.deleteOne();
+    req.io.emit("postDeleted", { postId: req.params.id });
     res.json({ message: "Post deleted successfully" });
   } catch (err) {
     console.error("Delete post error:", err);
