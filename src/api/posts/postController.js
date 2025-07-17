@@ -72,10 +72,11 @@ const getPosts = async (req, res) => {
     const posts = await Post.find()
       .sort({ createdAt: -1 })
       .populate("user", "name profilePic")
-      .populate("comments.user replies.user", "name profilePic");
+      .populate("comments.user", "name profilePic")
+      .populate("comments.replies.user", "name profilePic");
     res.json(posts);
   } catch (err) {
-    console.error("🔥 Failed to fetch posts:", err.message);
+    console.error("🔥 Failed to fetch posts:", err);
     res.status(500).json({ message: "Failed to fetch posts", error: err.message });
   }
 };
