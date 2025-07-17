@@ -36,7 +36,7 @@ const uploadToCloudinary = (buffer, folder, resource_type) => {
 
 const createPost = async (req, res) => {
   try {
-    const { caption, content } = req.body;
+    const { content } = req.body;
     let imageUrl = "", videoUrl = "";
 
     if (req.file) {
@@ -48,6 +48,10 @@ const createPost = async (req, res) => {
       );
       if (isVideo) videoUrl = uploadResult.secure_url;
       else imageUrl = uploadResult.secure_url;
+    }
+
+    if (!content && !imageUrl && !videoUrl) {
+      return res.status(400).json({ message: "Post must contain content or media." });
     }
 
     const post = new Post({
@@ -72,12 +76,11 @@ const getPosts = async (req, res) => {
     const posts = await Post.find()
       .sort({ createdAt: -1 })
       .populate("user", "name profilePic")
-      .populate("comments.user", "name profilePic")
-      .populate("comments.replies.user", "name profilePic");
+      .populate("comments.user replies.user", "name profilePic");
     res.json(posts);
   } catch (err) {
-    console.error("🔥 Failed to fetch posts:", err);
-    res.status(500).json({ message: "Failed to fetch posts", error: err.message });
+    console.error("Fetch posts failed:", err);
+    res.status(500).json({ message: "Failed to fetch posts" });
   }
 };
 
@@ -101,12 +104,12 @@ const likePost = async (req, res) => {
     const updated = await post
       .populate("user", "name profilePic")
       .populate("comments.user replies.user", "name profilePic");
-    
+
     req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
-    console.error("🔥 Like action failed:", err);
-    res.status(500).json({ message: "Like action failed", error: err.message });
+    console.error("Like failed:", err);
+    res.status(500).json({ message: "Like action failed" });
   }
 };
 
@@ -130,6 +133,7 @@ const commentPost = async (req, res) => {
     req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
+    console.error("Comment failed:", err);
     res.status(500).json({ message: "Comment failed" });
   }
 };
@@ -200,28 +204,31 @@ const reactToPost = async (req, res) => {
     const { emoji, action } = req.body;
     const userId = req.user._id.toString();
     const post = await Post.findById(req.params.id);
-
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     if (!(post.reactions instanceof Map)) {
       post.reactions = new Map(Object.entries(post.reactions || {}));
     }
 
-    const currentUsers = Array.isArray(post.reactions.get(emoji))
-      ? post.reactions.get(emoji)
-      : [];
+    // 🔁 Exclusive Reaction Logic: Remove user from all emojis first
+    for (const [key, users] of post.reactions.entries()) {
+      post.reactions.set(
+        key,
+        users.filter((id) => id !== userId)
+      );
+    }
 
-    if (action === "remove") {
-      const updatedUsers = currentUsers.filter((id) => id !== userId);
+    if (action === "add") {
+      const users = post.reactions.get(emoji) || [];
+      post.reactions.set(emoji, [...users, userId]);
+      await notify(post.user, userId, "reaction", `reacted ${emoji} to your post`);
+    } else if (action === "remove") {
+      const users = post.reactions.get(emoji) || [];
+      const updatedUsers = users.filter((id) => id !== userId);
       if (updatedUsers.length > 0) {
         post.reactions.set(emoji, updatedUsers);
       } else {
         post.reactions.delete(emoji);
-      }
-    } else if (action === "add") {
-      if (!currentUsers.includes(userId)) {
-        post.reactions.set(emoji, [...currentUsers, userId]);
-        await notify(post.user, userId, "reaction", `reacted ${emoji} to your post`);
       }
     } else {
       return res.status(400).json({ message: "Invalid action" });
@@ -237,8 +244,8 @@ const reactToPost = async (req, res) => {
     req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
-    console.error("🔥 Reaction failed:", err);
-    res.status(500).json({ message: "Reaction failed", error: err.message });
+    console.error("Reaction failed:", err);
+    res.status(500).json({ message: "Reaction failed" });
   }
 };
 
@@ -289,9 +296,9 @@ module.exports = {
   getPosts,
   likePost,
   commentPost,
+  replyToComment,
+  deleteComment,
   reactToPost,
   editPost,
   deletePost,
-  replyToComment,
-  deleteComment,
 };
