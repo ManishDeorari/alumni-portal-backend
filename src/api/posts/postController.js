@@ -1,8 +1,6 @@
 const Post = require("../../../models/Post");
 const User = require("../../../models/User");
-const cloudinary = require("../../../config/cloudinary");
-const streamifier = require("streamifier");
-const uploadToCloudinary = require("../../utils/cloudinaryUpload");
+const uploadToCloudinary = require("../../../utils/cloudinaryUpload");
 
 const notify = async (targetUserId, fromUserId, type, message) => {
   if (targetUserId.toString() === fromUserId.toString()) return;
