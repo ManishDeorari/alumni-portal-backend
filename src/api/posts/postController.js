@@ -1,6 +1,5 @@
 const Post = require("../../../models/Post");
 const User = require("../../../models/User");
-const uploadToCloudinary = require("../../../utils/cloudinaryUpload");
 
 const notify = async (targetUserId, fromUserId, type, message) => {
   if (targetUserId.toString() === fromUserId.toString()) return;
@@ -17,46 +16,29 @@ const notify = async (targetUserId, fromUserId, type, message) => {
 
 const createPost = async (req, res) => {
   try {
-    const { content } = req.body;
-    let imageUrl = "", videoUrl = "";
+    const { content, image, video } = req.body;
 
-    if (req.file) {
-      const isVideo = req.file.mimetype.startsWith("video/");
-      const uploadResult = await uploadToCloudinary(
-        req.file.buffer,
-        "posts",
-        isVideo ? "video" : "image"
-      );
-
-      if (isVideo) videoUrl = uploadResult.secure_url;
-      else imageUrl = uploadResult.secure_url;
-    }
-
-    if (!content?.trim() && !imageUrl && !videoUrl) {
+    if (!content?.trim() && !image && !video) {
       return res.status(400).json({ message: "Post must contain text or media." });
     }
 
     const post = new Post({
-      user: req.user._id || req.user.id,  // ✅ fallback for either field
+      user: req.user._id || req.user.id,
       content: content?.trim() || "",
-      image: imageUrl,
-      video: videoUrl,
+      image: image || "",
+      video: video || "",
     });
 
     await post.save();
-
     const populated = await post.populate("user", "name profilePicture");
 
-    // ✅ Emit event for real-time UI update
     req.io?.emit("postCreated", populated);
-
     res.status(201).json(populated);
   } catch (err) {
     console.error("❌ Post creation failed:", err);
     res.status(500).json({ message: "Failed to create post" });
   }
 };
-
 
 const getPosts = async (req, res) => {
   try {
