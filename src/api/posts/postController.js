@@ -75,8 +75,8 @@ const getPosts = async (req, res) => {
       .populate("comments.user replies.user", "name profilePic");
     res.json(posts);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to fetch posts" });
+    console.error("🔥 Failed to fetch posts:", err.message);
+    res.status(500).json({ message: "Failed to fetch posts", error: err.message });
   }
 };
 
