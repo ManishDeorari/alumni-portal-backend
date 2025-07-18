@@ -4,7 +4,7 @@ const { verifyToken } = require("../middleware/authMiddleware");
 
 const {
   getPosts,
-  //createPost,
+  createPost,
   //likePost,
   //reactToPost,
   //commentPost,
@@ -17,7 +17,7 @@ const {
 
 console.log("Imported functions from postController:", {
   getPosts,
-  //createPost,
+  createPost,
   //likePost,
   //reactToPost,
   //commentPost,
@@ -29,7 +29,7 @@ console.log("Imported functions from postController:", {
 });
 
 router.get("/", getPosts);
-//router.post("/", verifyToken, createPost);
+router.post("/", verifyToken, createPost);
 //router.patch("/:id/like", verifyToken, likePost);
 //router.patch("/:id/react", verifyToken, reactToPost);
 //router.post("/:id/comment", verifyToken, commentPost);
