@@ -15,6 +15,19 @@ const {
   editComment,
 } = require("../src/api/posts/postController");
 
+console.log("Imported functions from postController:", {
+  getPosts,
+  createPost,
+  likePost,
+  reactToPost,
+  replyToComment,
+  deleteComment,
+  editPost,
+  deletePost,
+  editComment,
+});
+
+
 router.get("/", getPosts);
 router.post("/", verifyToken, createPost);
 router.patch("/:id/like", verifyToken, likePost);
