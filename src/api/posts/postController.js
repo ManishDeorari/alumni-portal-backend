@@ -33,7 +33,7 @@ const createPost = async (req, res) => {
     const populated = await post.populate("user", "name profilePic");
 
     req.io?.emit("postCreated", populated);
-    res.status(201).json(populated);
+    res.status(201).json({ post: populated });
   } catch (err) {
     console.error("❌ Post creation failed:", err);
     res.status(500).json({ message: "Failed to create post" });
