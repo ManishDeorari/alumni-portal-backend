@@ -30,7 +30,7 @@ const createPost = async (req, res) => {
     });
 
     await post.save();
-    const populated = await post.populate("user", "name profilePicture");
+    const populated = await post.populate("user", "name profilePic");
 
     req.io?.emit("postCreated", populated);
     res.status(201).json(populated);

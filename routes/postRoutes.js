@@ -1,6 +1,7 @@
-// ✅ postRoutes.js (pagination-ready version)
 const express = require("express");
-const auth = require("../middleware/authMiddleware");
+const router = express.Router();
+const { verifyToken } = require("../middleware/authMiddleware");
+
 const {
   getPosts,
   createPost,
@@ -12,21 +13,17 @@ const {
   editPost,
   deletePost,
   editComment,
-} = require("../src/api/posts/postController");
+} = require("../controllers/post/postController");
 
-const router = express.Router();
-const { verifyToken } = require("../middleware/authMiddleware");
-
-// ✅ Routes
-router.get("/", getPosts); // ⬅️ Add support for ?page=1&limit=10 in getPosts later
-router.post("/", auth, createPost);
-router.patch("/:id/like", auth, likePost);
-router.patch("/:id/react", auth, reactToPost);
-router.post("/:id/comment", auth, commentPost);
-router.post("/:postId/comment/:commentId/reply", auth, replyToComment);
-router.delete("/:postId/comment/:commentId", auth, deleteComment);
-router.patch("/:id", auth, editPost);
-router.delete("/:id", auth, deletePost);
+router.get("/", getPosts);
+router.post("/", verifyToken, createPost);
+router.patch("/:id/like", verifyToken, likePost);
+router.patch("/:id/react", verifyToken, reactToPost);
+router.post("/:id/comment", verifyToken, commentPost);
+router.post("/:postId/comment/:commentId/reply", verifyToken, replyToComment);
+router.delete("/:postId/comment/:commentId", verifyToken, deleteComment);
+router.patch("/:id", verifyToken, editPost);
+router.delete("/:id", verifyToken, deletePost);
 router.put("/:postId/comments/:commentId", verifyToken, editComment);
 
 module.exports = router;
