@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { verifyToken } = require("../middleware/authMiddleware");
+const auth = require("../middleware/authMiddleware");
 
 const {
   getPosts,
@@ -29,7 +29,7 @@ console.log("Imported functions from postController:", {
 });
 
 router.get("/", getPosts);
-router.post("/", verifyToken, createPost);
+router.post("/", auth, createPost);
 //router.patch("/:id/like", verifyToken, likePost);
 //router.patch("/:id/react", verifyToken, reactToPost);
 //router.post("/:id/comment", verifyToken, commentPost);
