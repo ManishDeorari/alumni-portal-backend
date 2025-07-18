@@ -12,6 +12,7 @@ const {
   editPost,
   deletePost,
   editComment,
+  //updatePost,
 } = require("../src/api/posts/postController");
 
 const router = express.Router();
