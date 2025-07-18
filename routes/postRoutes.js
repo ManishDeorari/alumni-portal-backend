@@ -11,6 +11,7 @@ const {
   deleteComment,
   editPost,
   deletePost,
+  editComment,
 } = require("../src/api/posts/postController");
 
 const router = express.Router();
@@ -25,5 +26,6 @@ router.post("/:postId/comment/:commentId/reply", auth, replyToComment);
 router.delete("/:postId/comment/:commentId", auth, deleteComment);
 router.patch("/:id", auth, editPost);
 router.delete("/:id", auth, deletePost);
+router.put("/:postId/comments/:commentId", verifyToken, editComment);
 
 module.exports = router;
