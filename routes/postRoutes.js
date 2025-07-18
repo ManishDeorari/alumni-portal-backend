@@ -13,7 +13,7 @@ const {
   editPost,
   deletePost,
   editComment,
-} = require("../controllers/post/postController");
+} = require("../src/api/posts/postController");
 
 router.get("/", getPosts);
 router.post("/", verifyToken, createPost);
