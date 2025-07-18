@@ -1,4 +1,4 @@
-// ✅ postRoutes.js (cleaned version)
+// ✅ postRoutes.js (pagination-ready version)
 const express = require("express");
 const auth = require("../middleware/authMiddleware");
 const {
@@ -12,14 +12,13 @@ const {
   editPost,
   deletePost,
   editComment,
-  //updatePost,
 } = require("../src/api/posts/postController");
 
 const router = express.Router();
 const { verifyToken } = require("../middleware/authMiddleware");
 
 // ✅ Routes
-router.get("/", getPosts);
+router.get("/", getPosts); // ⬅️ Add support for ?page=1&limit=10 in getPosts later
 router.post("/", auth, createPost);
 router.patch("/:id/like", auth, likePost);
 router.patch("/:id/react", auth, reactToPost);
