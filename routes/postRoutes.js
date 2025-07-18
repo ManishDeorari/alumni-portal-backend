@@ -7,7 +7,7 @@ const {
   createPost,
   likePost,
   reactToPost,
-  commentPost,
+  //commentPost,
   replyToComment,
   deleteComment,
   editPost,
@@ -19,7 +19,7 @@ router.get("/", getPosts);
 router.post("/", verifyToken, createPost);
 router.patch("/:id/like", verifyToken, likePost);
 router.patch("/:id/react", verifyToken, reactToPost);
-router.post("/:id/comment", verifyToken, commentPost);
+//router.post("/:id/comment", verifyToken, commentPost);
 router.post("/:postId/comment/:commentId/reply", verifyToken, replyToComment);
 router.delete("/:postId/comment/:commentId", verifyToken, deleteComment);
 router.patch("/:id", verifyToken, editPost);
