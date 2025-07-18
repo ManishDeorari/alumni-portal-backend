@@ -15,6 +15,7 @@ const {
 } = require("../src/api/posts/postController");
 
 const router = express.Router();
+const { verifyToken } = require("../middleware/auth");
 
 // ✅ Routes
 router.get("/", getPosts);
