@@ -1,5 +1,6 @@
 const Post = require("../../../models/Post");
 const User = require("../../../models/User");
+const cloudinary = require("cloudinary");
 
 const notify = async (targetUserId, fromUserId, type, message) => {
   if (targetUserId.toString() === fromUserId.toString()) return;
@@ -289,6 +290,9 @@ const editPost = async (req, res) => {
     }
 
     post.content = req.body.content || post.content;
+    if (req.body.images) post.images = req.body.images;
+    if (req.body.video) post.video = req.body.video;
+
     await post.save();
 
     const updated = await post
@@ -313,7 +317,26 @@ const deletePost = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
+    // ✅ Delete images from Cloudinary
+    if (post.images && post.images.length > 0) {
+      for (const image of post.images) {
+        if (image.public_id) {
+          await cloudinary.uploader.destroy(image.public_id, {
+            resource_type: "image",
+          });
+        }
+      }
+    }
+
+    // ✅ Delete video from Cloudinary
+    if (post.video && post.video.public_id) {
+      await cloudinary.uploader.destroy(post.video.public_id, {
+        resource_type: "video",
+      });
+    }
+
     await post.deleteOne();
+
     req.io.emit("postDeleted", { postId: req.params.id });
     res.json({ message: "Post deleted successfully" });
   } catch (err) {
@@ -321,6 +344,7 @@ const deletePost = async (req, res) => {
     res.status(500).json({ message: "Failed to delete post" });
   }
 };
+
 
 module.exports = {
   createPost,
