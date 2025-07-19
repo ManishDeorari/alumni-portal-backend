@@ -338,10 +338,12 @@ const deletePost = async (req, res) => {
       if (post.video?.public_id) {
         console.log("🧨 Deleting video:", post.video.public_id);
         try {
-          const result = await cloudinary.uploader.destroy(post.video.public_id, {
-            resource_type: "auto", // 🔥 FIXED
-          });
-          console.log("🎯 Cloudinary delete response:", result);
+            const resourceType = post.video.url.includes('/video/') ? "video" : "raw";
+            await cloudinary.uploader.destroy(post.video.public_id, {
+              resource_type: resourceType,
+            });
+          console.log("Video public_id:", post.video.public_id);
+          console.log("Video URL:", post.video.url);
         } catch (err) {
           console.error("❌ Cloudinary video delete failed:", err.message);
         }
