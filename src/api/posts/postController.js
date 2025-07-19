@@ -314,7 +314,7 @@ const editPost = async (req, res) => {
   }
 };
 
-const deletePost = async (req, res) => {
+export const deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
@@ -323,44 +323,44 @@ const deletePost = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    // ✅ Delete images from Cloudinary
+    // ✅ Delete images
     if (post.images?.length > 0) {
       for (const image of post.images) {
         if (image.public_id) {
-          await cloudinary.uploader.destroy(image.public_id, {
-            resource_type: "image",
-          });
+          try {
+            await cloudinary.uploader.destroy(image.public_id, {
+              resource_type: "image",
+            });
+            console.log(`🖼️ Deleted image: ${image.public_id}`);
+          } catch (err) {
+            console.error(`❌ Failed to delete image ${image.public_id}:`, err.message);
+          }
         }
       }
     }
 
-    // ✅ Delete video from Cloudinary (with fallback resource types)
+    // ✅ Delete video
     if (post.video?.public_id) {
-      console.log("🧨 Deleting video:", post.video.public_id);
-      console.log("Video URL:", post.video.url);
-      // Strip any folder prefix if present
-      if (publicId.includes("/")) {
-        const parts = publicId.split("/");
-        publicId = parts[parts.length - 1];
-      }
-      const publicId = post.video.public_id;
-      const resourceTypes = ["video", "raw", "auto"]; // fallback types
-
+      const publicId = post.video.public_id; // Keep full path (e.g., alumni/videos/xxx)
+      const resourceTypes = ["video", "raw", "auto"];
       let deleted = false;
+
+      console.log("🧨 Deleting video:", publicId);
+      console.log("Video URL:", post.video.url);
 
       for (const type of resourceTypes) {
         try {
           const result = await cloudinary.uploader.destroy(publicId, {
             resource_type: type,
           });
-
           console.log(`🎯 Tried delete with resource_type "${type}":`, result);
+
           if (result.result === "ok") {
             deleted = true;
             break;
           }
         } catch (err) {
-          console.error(`❌ Delete failed for type "${type}":`, err.message);
+          console.error(`❌ Delete failed for resource_type "${type}":`, err.message);
         }
       }
 
@@ -369,7 +369,7 @@ const deletePost = async (req, res) => {
       }
     }
 
-    // 🗑️ Delete post from DB
+    // ✅ Delete post from DB
     await post.deleteOne();
 
     // 🔁 Emit real-time deletion
@@ -377,9 +377,8 @@ const deletePost = async (req, res) => {
 
     // ✅ Respond
     res.json({ message: "Post deleted successfully" });
-
   } catch (err) {
-    console.error("Delete post error:", err);
+    console.error("❌ Delete post error:", err);
     res.status(500).json({ message: "Failed to delete post" });
   }
 };
