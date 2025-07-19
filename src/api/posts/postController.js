@@ -327,8 +327,11 @@ const deletePost = async (req, res) => {
       }
     }
 
-    await post.deleteOne();
-    req.io.emit("postDeleted", { postId: req.params.id });
+    await Post.findByIdAndDelete(req.params.id);
+
+    socket.on("postDeleted", ({ postId }) => {
+      setPosts((prev) => prev.filter((p) => p._id !== postId));
+    });
     res.json({ message: "Post deleted successfully" });
   } catch (err) {
     console.error("❌ Delete post error:", err);
