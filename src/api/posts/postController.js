@@ -324,7 +324,7 @@ const deletePost = async (req, res) => {
     }
 
     // ✅ Delete images from Cloudinary
-    if (post.images && post.images.length > 0) {
+    if (post.images?.length > 0) {
       for (const image of post.images) {
         if (image.public_id) {
           await cloudinary.uploader.destroy(image.public_id, {
@@ -335,23 +335,29 @@ const deletePost = async (req, res) => {
     }
 
     // ✅ Delete video from Cloudinary
-      if (post.video?.public_id) {
-        console.log("🧨 Deleting video:", post.video.public_id);
-        try {
-            const resourceType = post.video.url.includes('/video/') ? "video" : "raw";
-            await cloudinary.uploader.destroy(post.video.public_id, {
-              resource_type: resourceType,
-            });
-          console.log("Video public_id:", post.video.public_id);
-          console.log("Video URL:", post.video.url);
-        } catch (err) {
-          console.error("❌ Cloudinary video delete failed:", err.message);
-        }
-      }
+    if (post.video?.public_id) {
+      console.log("🧨 Deleting video:", post.video.public_id);
+      console.log("Video URL:", post.video.url);
 
+      try {
+        const resourceType = post.video.url.includes('/video/') ? "video" : "raw";
+        const result = await cloudinary.uploader.destroy(post.video.public_id, {
+          resource_type: resourceType,
+        });
+
+        console.log("🎯 Cloudinary delete response:", result);
+      } catch (err) {
+        console.error("❌ Cloudinary video delete failed:", err.message);
+      }
+    }
+
+    // 🗑️ Delete post from DB
     await post.deleteOne();
 
+    // 🔁 Emit real-time deletion
     req.io.emit("postDeleted", { postId: req.params.id });
+
+    // ✅ Respond
     res.json({ message: "Post deleted successfully" });
   } catch (err) {
     console.error("Delete post error:", err);
