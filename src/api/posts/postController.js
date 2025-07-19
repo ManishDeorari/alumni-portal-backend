@@ -333,16 +333,15 @@ const deletePost = async (req, res) => {
         }
       }
     }
-
-    // ✅ Delete video from Cloudinary
+   // ✅ Delete video from Cloudinary 
     if (post.video?.public_id) {
       console.log("🧨 Deleting video:", post.video.public_id);
       console.log("Video URL:", post.video.url);
 
       try {
-        const resourceType = post.video.url.includes('/video/') ? "video" : "raw";
+        // Force resource_type to 'video' to avoid edge-case errors
         const result = await cloudinary.uploader.destroy(post.video.public_id, {
-          resource_type: resourceType,
+          resource_type: "video",
         });
 
         console.log("🎯 Cloudinary delete response:", result);
@@ -350,7 +349,6 @@ const deletePost = async (req, res) => {
         console.error("❌ Cloudinary video delete failed:", err.message);
       }
     }
-
     // 🗑️ Delete post from DB
     await post.deleteOne();
 
