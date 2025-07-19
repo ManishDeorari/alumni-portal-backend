@@ -329,9 +329,8 @@ const deletePost = async (req, res) => {
 
     await Post.findByIdAndDelete(req.params.id);
 
-    socket.on("postDeleted", ({ postId }) => {
-      setPosts((prev) => prev.filter((p) => p._id !== postId));
-    });
+    // ✅ Emit event to all clients
+    req.io.emit("postDeleted", { postId: req.params.id });
     res.json({ message: "Post deleted successfully" });
   } catch (err) {
     console.error("❌ Delete post error:", err);
