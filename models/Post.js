@@ -16,8 +16,16 @@ const commentSchema = new mongoose.Schema({
 const postSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   content: { type: String, required: true },
-  images: [{ type: String }],
-  video: { type: String, default: "" },
+  images: [
+    {
+      url: String,
+      public_id: String,
+    },
+  ],
+  video: {
+    url: String,
+    public_id: String,
+  },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   comments: [commentSchema], // ✅ Corrected field
   reactions: {
