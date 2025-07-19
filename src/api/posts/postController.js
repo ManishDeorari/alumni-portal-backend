@@ -335,17 +335,17 @@ const deletePost = async (req, res) => {
     }
 
     // ✅ Delete video from Cloudinary
-    if (post.video?.public_id) {
-      console.log("🧨 Deleting video:", post.video.public_id);
-      try {
-        const result = await cloudinary.uploader.destroy(post.video.public_id, {
-          resource_type: "video",
-        });
-        console.log("🎯 Cloudinary delete response:", result);
-      } catch (err) {
-        console.error("❌ Cloudinary video delete failed:", err.message);
+      if (post.video?.public_id) {
+        console.log("🧨 Deleting video:", post.video.public_id);
+        try {
+          const result = await cloudinary.uploader.destroy(post.video.public_id, {
+            resource_type: "auto", // 🔥 FIXED
+          });
+          console.log("🎯 Cloudinary delete response:", result);
+        } catch (err) {
+          console.error("❌ Cloudinary video delete failed:", err.message);
+        }
       }
-    }
 
     await post.deleteOne();
 
