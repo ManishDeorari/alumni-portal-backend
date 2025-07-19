@@ -338,6 +338,11 @@ const deletePost = async (req, res) => {
     if (post.video?.public_id) {
       console.log("🧨 Deleting video:", post.video.public_id);
       console.log("Video URL:", post.video.url);
+      // Strip any folder prefix if present
+      if (publicId.includes("/")) {
+        const parts = publicId.split("/");
+        publicId = parts[parts.length - 1];
+      }
       const publicId = post.video.public_id;
       const resourceTypes = ["video", "raw", "auto"]; // fallback types
 
