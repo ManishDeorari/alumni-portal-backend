@@ -282,29 +282,40 @@ const reactToPost = async (req, res) => {
 
 const editPost = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ message: "Post not found" });
+    const { content, images, video } = req.body;
+    const postId = req.params.id;
 
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // Ensure only the original poster can edit
     if (post.user.toString() !== req.user.id) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    post.content = req.body.content || post.content;
-    if (req.body.images) post.images = req.body.images;
-    if (req.body.video) post.video = req.body.video;
+    // Update fields if provided
+    if (typeof content === "string") post.content = content;
+    if (Array.isArray(images)) post.images = images;
+    if (typeof video === "string") post.video = video;
 
     await post.save();
 
-    const updated = await post
+    const updatedPost = await Post.findById(post._id)
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
       .populate({ path: "comments.replies.user", select: "name profilePic" });
 
-    req.io.emit("postUpdated", updated);
-    res.json(updated);
-  } catch (err) {
-    console.error("Edit post error:", err);
-    res.status(500).json({ message: "Failed to edit post" });
+    // Optional: Emit socket update
+    if (req.io) {
+      req.io.emit("postUpdated", updatedPost);
+    }
+
+    res.json(updatedPost);
+  } catch (error) {
+    console.error("❌ Edit Post Error:", error);
+    res.status(500).json({ message: "Failed to update post" });
   }
 };
 
