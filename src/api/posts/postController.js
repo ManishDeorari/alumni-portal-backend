@@ -1,10 +1,12 @@
 const Post = require("../../../models/Post");
 const User = require("../../../models/User");
-const cloudinary = require("cloudinary");
+const cloudinary = require("cloudinary").v2;
 
+// Reusable Notification
 const notify = async (targetUserId, fromUserId, type, message) => {
   if (targetUserId.toString() === fromUserId.toString()) return;
   const user = await User.findById(targetUserId);
+  if (!user) return;
   user.notifications.push({
     type,
     message,
@@ -15,13 +17,14 @@ const notify = async (targetUserId, fromUserId, type, message) => {
   await user.save();
 };
 
+// ✅ Create Post
 const createPost = async (req, res) => {
   try {
     const { content, images, video } = req.body;
 
-    const hasContent = content?.trim();
+    const hasContent = content?.trim()?.length > 0;
     const hasImages = Array.isArray(images) && images.length > 0;
-    const hasVideo = video && typeof video === "object" && video.url;
+    const hasVideo = video?.url;
 
     if (!hasContent && !hasImages && !hasVideo) {
       return res.status(400).json({ message: "Post must contain text or media." });
@@ -36,7 +39,6 @@ const createPost = async (req, res) => {
 
     await post.save();
     const populated = await post.populate("user", "name profilePic");
-
     req.io?.emit("postCreated", populated);
     res.status(201).json({ post: populated });
 
@@ -47,6 +49,7 @@ const createPost = async (req, res) => {
   }
 };
 
+// ✅ Get Posts
 const getPosts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -64,11 +67,12 @@ const getPosts = async (req, res) => {
 
     res.json({ posts, total });
   } catch (err) {
-    console.error("Fetch posts failed:", err);
+    console.error("❌ Fetch posts failed:", err);
     res.status(500).json({ message: "Failed to fetch posts" });
   }
 };
 
+// ✅ Like Post
 const likePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -77,8 +81,8 @@ const likePost = async (req, res) => {
 
     if (!Array.isArray(post.likes)) post.likes = [];
 
-    const liked = post.likes.includes(userId);
-    if (liked) {
+    const alreadyLiked = post.likes.includes(userId);
+    if (alreadyLiked) {
       post.likes = post.likes.filter((id) => id !== userId);
     } else {
       post.likes.push(userId);
@@ -86,7 +90,6 @@ const likePost = async (req, res) => {
     }
 
     await post.save();
-
     const updated = await post
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
@@ -95,11 +98,12 @@ const likePost = async (req, res) => {
     req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
-    console.error("Like failed:", err);
+    console.error("❌ Like failed:", err);
     res.status(500).json({ message: "Like action failed" });
   }
 };
 
+// ✅ Comment on Post
 const commentPost = async (req, res) => {
   try {
     const { text } = req.body;
@@ -109,7 +113,7 @@ const commentPost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    post.comments.push({ user: req.user._id, text, createdAt: new Date() });
+    post.comments.push({ user: req.user._id, text: text.trim(), createdAt: new Date() });
     await notify(post.user, req.user._id, "comment", `${req.user.name} commented on your post`);
     await post.save();
 
@@ -121,11 +125,12 @@ const commentPost = async (req, res) => {
     req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
-    console.error("Comment failed:", err);
+    console.error("❌ Comment failed:", err);
     res.status(500).json({ message: "Comment failed" });
   }
 };
 
+// ✅ Reply to Comment
 const replyToComment = async (req, res) => {
   try {
     const { text } = req.body;
@@ -139,13 +144,7 @@ const replyToComment = async (req, res) => {
     const comment = post.comments.id(req.params.commentId);
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
-    comment.replies = comment.replies || [];
-    comment.replies.push({
-      user: req.user._id,
-      text,
-      createdAt: new Date(),
-    });
-
+    comment.replies.push({ user: req.user._id, text: text.trim(), createdAt: new Date() });
     await post.save();
 
     const updated = await post
@@ -156,11 +155,12 @@ const replyToComment = async (req, res) => {
     req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
-    console.error("Reply failed:", err);
+    console.error("❌ Reply failed:", err);
     res.status(500).json({ message: "Reply failed" });
   }
 };
 
+// ✅ Delete Comment
 const deleteComment = async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
@@ -170,7 +170,7 @@ const deleteComment = async (req, res) => {
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
     if (comment.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Unauthorized to delete this comment" });
+      return res.status(403).json({ message: "Unauthorized" });
     }
 
     comment.remove();
@@ -184,12 +184,12 @@ const deleteComment = async (req, res) => {
     req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
-    console.error("Delete comment error:", err);
+    console.error("❌ Delete comment error:", err);
     res.status(500).json({ message: "Failed to delete comment" });
   }
 };
 
-// Add this inside postController.js
+// ✅ Edit Comment
 const editComment = async (req, res) => {
   try {
     const { text } = req.body;
@@ -204,12 +204,11 @@ const editComment = async (req, res) => {
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
     if (comment.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Unauthorized to edit this comment" });
+      return res.status(403).json({ message: "Unauthorized" });
     }
 
-    comment.text = text;
+    comment.text = text.trim();
     comment.editedAt = new Date();
-
     await post.save();
 
     const updated = await post
@@ -220,11 +219,12 @@ const editComment = async (req, res) => {
     req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
-    console.error("Edit comment error:", err);
+    console.error("❌ Edit comment error:", err);
     res.status(500).json({ message: "Failed to edit comment" });
   }
 };
 
+// ✅ React to Post
 const reactToPost = async (req, res) => {
   try {
     const { emoji, action } = req.body;
@@ -232,29 +232,19 @@ const reactToPost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    if (!(post.reactions instanceof Map)) {
-      post.reactions = new Map(Object.entries(post.reactions || {}));
-    }
+    post.reactions = new Map(Object.entries(post.reactions || {}));
 
+    // Remove user from all previous reactions
     for (const [key, users] of post.reactions.entries()) {
-      post.reactions.set(
-        key,
-        users.filter((id) => id !== userId)
-      );
+      post.reactions.set(key, users.filter((id) => id !== userId));
     }
 
     if (action === "add") {
       const users = post.reactions.get(emoji) || [];
       post.reactions.set(emoji, [...users, userId]);
-      await notify(post.user, userId, "reaction", `reacted ${emoji} to your post`);
+      await notify(post.user, userId, "reaction", `${req.user.name} reacted ${emoji}`);
     } else if (action === "remove") {
-      const users = post.reactions.get(emoji) || [];
-      const updatedUsers = users.filter((id) => id !== userId);
-      if (updatedUsers.length > 0) {
-        post.reactions.set(emoji, updatedUsers);
-      } else {
-        post.reactions.delete(emoji);
-      }
+      post.reactions.delete(emoji);
     } else {
       return res.status(400).json({ message: "Invalid action" });
     }
@@ -270,30 +260,24 @@ const reactToPost = async (req, res) => {
     req.io.emit("postUpdated", updated);
     res.json(updated);
   } catch (err) {
-    console.error("Reaction failed:", err);
+    console.error("❌ Reaction failed:", err);
     res.status(500).json({ message: "Reaction failed" });
   }
 };
 
+// ✅ Edit Post
 const editPost = async (req, res) => {
   try {
     const { content, images, video } = req.body;
-    const postId = req.params.id;
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const post = await Post.findById(postId);
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
-
-    // Ensure only the original poster can edit
-    if (post.user.toString() !== req.user.id) {
+    if (post.user.toString() !== req.user.id)
       return res.status(403).json({ message: "Unauthorized" });
-    }
 
-    // Update fields if provided
-    if (typeof content === "string") post.content = content;
-    if (Array.isArray(images)) post.images = images;
-    if (typeof video === "string") post.video = video;
+    post.content = typeof content === "string" ? content.trim() : post.content;
+    post.images = Array.isArray(images) ? images : post.images;
+    post.video = video ?? post.video;
 
     await post.save();
 
@@ -302,80 +286,49 @@ const editPost = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePic" })
       .populate({ path: "comments.replies.user", select: "name profilePic" });
 
-    // Optional: Emit socket update
-    if (req.io) {
-      req.io.emit("postUpdated", updatedPost);
-    }
-
+    req.io.emit("postUpdated", updatedPost);
     res.json(updatedPost);
-  } catch (error) {
-    console.error("❌ Edit Post Error:", error);
+  } catch (err) {
+    console.error("❌ Edit Post error:", err);
     res.status(500).json({ message: "Failed to update post" });
   }
 };
 
-export const deletePost = async (req, res) => {
+// ✅ Delete Post
+const deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    if (post.user.toString() !== req.user.id) {
+    if (post.user.toString() !== req.user.id)
       return res.status(403).json({ message: "Unauthorized" });
-    }
 
-    // ✅ Delete images
-    if (post.images?.length > 0) {
-      for (const image of post.images) {
-        if (image.public_id) {
-          try {
-            await cloudinary.uploader.destroy(image.public_id, {
-              resource_type: "image",
-            });
-            console.log(`🖼️ Deleted image: ${image.public_id}`);
-          } catch (err) {
-            console.error(`❌ Failed to delete image ${image.public_id}:`, err.message);
-          }
+    for (const image of post.images || []) {
+      if (image.public_id) {
+        try {
+          await cloudinary.uploader.destroy(image.public_id, { resource_type: "image" });
+        } catch (err) {
+          console.error("❌ Image delete failed:", err.message);
         }
       }
     }
 
-    // ✅ Delete video
     if (post.video?.public_id) {
-      const publicId = post.video.public_id; // Keep full path (e.g., alumni/videos/xxx)
-      const resourceTypes = ["video", "raw", "auto"];
-      let deleted = false;
-
-      console.log("🧨 Deleting video:", publicId);
-      console.log("Video URL:", post.video.url);
-
-      for (const type of resourceTypes) {
+      const fallbackTypes = ["video", "raw", "auto"];
+      for (const type of fallbackTypes) {
         try {
-          const result = await cloudinary.uploader.destroy(publicId, {
+          const result = await cloudinary.uploader.destroy(post.video.public_id, {
             resource_type: type,
           });
-          console.log(`🎯 Tried delete with resource_type "${type}":`, result);
-
-          if (result.result === "ok") {
-            deleted = true;
-            break;
-          }
+          if (result.result === "ok") break;
         } catch (err) {
-          console.error(`❌ Delete failed for resource_type "${type}":`, err.message);
+          console.error(`❌ Failed deleting video as ${type}:`, err.message);
         }
-      }
-
-      if (!deleted) {
-        console.warn(`⚠️ Failed to delete video ${publicId} via all fallback types`);
       }
     }
 
-    // ✅ Delete post from DB
     await post.deleteOne();
-
-    // 🔁 Emit real-time deletion
     req.io.emit("postDeleted", { postId: req.params.id });
-
-    // ✅ Respond
     res.json({ message: "Post deleted successfully" });
   } catch (err) {
     console.error("❌ Delete post error:", err);
@@ -390,8 +343,8 @@ module.exports = {
   commentPost,
   replyToComment,
   deleteComment,
+  editComment,
   reactToPost,
   editPost,
   deletePost,
-  editComment,
 };
