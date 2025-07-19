@@ -16,17 +16,25 @@ const notify = async (targetUserId, fromUserId, type, message) => {
 
 const createPost = async (req, res) => {
   try {
-    const { content, image, video } = req.body;
+    const { content, images, video } = req.body;
 
-    if (!content?.trim() && !image && !video) {
-      return res.status(400).json({ message: "Post must contain text or media." });
+    // Check if at least one of content, images or video is present
+    const hasContent = content?.trim();
+    const hasImages = Array.isArray(images) && images.length > 0;
+    const hasVideo = video?.trim();
+
+    if (!hasContent && !hasImages && !hasVideo) {
+      return res
+        .status(400)
+        .json({ message: "Post must contain text or media." });
     }
 
+    // Create post with multiple images
     const post = new Post({
       user: req.user._id || req.user.id,
-      content: content?.trim() || "",
-      image: image || "",
-      video: video || "",
+      content: hasContent ? content.trim() : "",
+      images: hasImages ? images : [],   // ✅ handle array of images
+      video: hasVideo ? video : "",
     });
 
     await post.save();
@@ -34,11 +42,14 @@ const createPost = async (req, res) => {
 
     req.io?.emit("postCreated", populated);
     res.status(201).json({ post: populated });
+
+    console.log("🖼️ Received images:", images); // ✅ good for debug
   } catch (err) {
     console.error("❌ Post creation failed:", err);
     res.status(500).json({ message: "Failed to create post" });
   }
 };
+
 
 const getPosts = async (req, res) => {
   try {
