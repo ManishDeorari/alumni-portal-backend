@@ -333,22 +333,37 @@ const deletePost = async (req, res) => {
         }
       }
     }
-   // ✅ Delete video from Cloudinary 
+
+    // ✅ Delete video from Cloudinary (with fallback resource types)
     if (post.video?.public_id) {
       console.log("🧨 Deleting video:", post.video.public_id);
       console.log("Video URL:", post.video.url);
+      const publicId = post.video.public_id;
+      const resourceTypes = ["video", "raw", "auto"]; // fallback types
 
-      try {
-        // Force resource_type to 'video' to avoid edge-case errors
-        const result = await cloudinary.uploader.destroy(post.video.public_id, {
-          resource_type: "video",
-        });
+      let deleted = false;
 
-        console.log("🎯 Cloudinary delete response:", result);
-      } catch (err) {
-        console.error("❌ Cloudinary video delete failed:", err.message);
+      for (const type of resourceTypes) {
+        try {
+          const result = await cloudinary.uploader.destroy(publicId, {
+            resource_type: type,
+          });
+
+          console.log(`🎯 Tried delete with resource_type "${type}":`, result);
+          if (result.result === "ok") {
+            deleted = true;
+            break;
+          }
+        } catch (err) {
+          console.error(`❌ Delete failed for type "${type}":`, err.message);
+        }
+      }
+
+      if (!deleted) {
+        console.warn(`⚠️ Failed to delete video ${publicId} via all fallback types`);
       }
     }
+
     // 🗑️ Delete post from DB
     await post.deleteOne();
 
@@ -357,6 +372,7 @@ const deletePost = async (req, res) => {
 
     // ✅ Respond
     res.json({ message: "Post deleted successfully" });
+
   } catch (err) {
     console.error("Delete post error:", err);
     res.status(500).json({ message: "Failed to delete post" });
