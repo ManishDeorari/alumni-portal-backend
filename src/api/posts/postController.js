@@ -103,7 +103,11 @@ const likePost = async (req, res) => {
       .lean();
 
     req.io.emit("postUpdated", updated); // For live update
-    req.io.emit("postLiked", { postId: post._id, userId }); // For animation
+    req.io.emit("postLiked", {
+      postId: post._id,
+      userId,
+      isLiked: !alreadyLiked, // this will be false if unliking
+    });
 
     res.json(updated);
   } catch (err) {
