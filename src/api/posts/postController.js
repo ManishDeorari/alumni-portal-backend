@@ -86,19 +86,25 @@ const likePost = async (req, res) => {
       post.likes = post.likes.filter((id) => id !== userId);
     } else {
       post.likes.push(userId);
-      await notify(post.user, userId, "like", `${req.user.name} liked your post`);
+      if (post.user.toString() !== userId) {
+        await notify(post.user, userId, "like", `${req.user.name} liked your post`);
+      }
     }
 
     await post.save();
+
     const updated = await post
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" });
+      .populate({ path: "comments.replies.user", select: "name profilePic" })
+      .lean();
 
     req.io.emit("postUpdated", updated);
+    req.io.emit("postLiked", { postId: post._id, userId }); // 🔄 Real-time like animation support
+
     res.json(updated);
   } catch (err) {
-    console.error("❌ Like failed:", err);
+    console.error("❌ Like failed:", { postId: req.params.id, user: req.user._id, error: err });
     res.status(500).json({ message: "Like action failed" });
   }
 };
@@ -113,14 +119,23 @@ const commentPost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    post.comments.push({ user: req.user._id, text: text.trim(), createdAt: new Date() });
-    await notify(post.user, req.user._id, "comment", `${req.user.name} commented on your post`);
+    post.comments.push({
+      user: req.user._id,
+      text: text.trim(),
+      createdAt: new Date(),
+    });
+
+    if (post.user.toString() !== req.user._id.toString()) {
+      await notify(post.user, req.user._id, "comment", `${req.user.name} commented on your post`);
+    }
+
     await post.save();
 
     const updated = await post
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" });
+      .populate({ path: "comments.replies.user", select: "name profilePic" })
+      .lean();
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
@@ -144,13 +159,19 @@ const replyToComment = async (req, res) => {
     const comment = post.comments.id(req.params.commentId);
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
-    comment.replies.push({ user: req.user._id, text: text.trim(), createdAt: new Date() });
+    comment.replies.push({
+      user: req.user._id,
+      text: text.trim(),
+      createdAt: new Date(),
+    });
+
     await post.save();
 
     const updated = await post
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" });
+      .populate({ path: "comments.replies.user", select: "name profilePic" })
+      .lean();
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
@@ -179,7 +200,8 @@ const deleteComment = async (req, res) => {
     const updated = await post
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" });
+      .populate({ path: "comments.replies.user", select: "name profilePic" })
+      .lean();
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
@@ -214,7 +236,8 @@ const editComment = async (req, res) => {
     const updated = await post
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" });
+      .populate({ path: "comments.replies.user", select: "name profilePic" })
+      .lean();
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
@@ -229,12 +252,13 @@ const reactToPost = async (req, res) => {
   try {
     const { emoji, action } = req.body;
     const userId = req.user._id.toString();
+
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     post.reactions = new Map(Object.entries(post.reactions || {}));
 
-    // Remove user from all previous reactions
+    // Remove user from all emojis
     for (const [key, users] of post.reactions.entries()) {
       post.reactions.set(key, users.filter((id) => id !== userId));
     }
@@ -242,11 +266,22 @@ const reactToPost = async (req, res) => {
     if (action === "add") {
       const users = post.reactions.get(emoji) || [];
       post.reactions.set(emoji, [...users, userId]);
-      await notify(post.user, userId, "reaction", `${req.user.name} reacted ${emoji}`);
+
+      if (post.user.toString() !== userId) {
+        await notify(post.user, userId, "reaction", `${req.user.name} reacted ${emoji} to your post`);
+      }
     } else if (action === "remove") {
-      post.reactions.delete(emoji);
+      const users = post.reactions.get(emoji) || [];
+      post.reactions.set(emoji, users.filter((id) => id !== userId));
     } else {
       return res.status(400).json({ message: "Invalid action" });
+    }
+
+    // Clean up empty emojis
+    for (const [emoji, users] of post.reactions.entries()) {
+      if (users.length === 0) {
+        post.reactions.delete(emoji);
+      }
     }
 
     post.reactions = Object.fromEntries(post.reactions);
@@ -255,7 +290,8 @@ const reactToPost = async (req, res) => {
     const updated = await post
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" });
+      .populate({ path: "comments.replies.user", select: "name profilePic" })
+      .lean();
 
     req.io.emit("postUpdated", updated);
     res.json(updated);
@@ -264,6 +300,7 @@ const reactToPost = async (req, res) => {
     res.status(500).json({ message: "Reaction failed" });
   }
 };
+
 
 // ✅ Edit Post
 const editPost = async (req, res) => {
