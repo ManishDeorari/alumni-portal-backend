@@ -267,35 +267,44 @@ const reactToPost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    post.reactions = new Map(Object.entries(post.reactions || {}));
+    // ✅ Convert to plain object if needed
+    let reactions = post.reactions || {};
 
-    // Remove user from all emojis
-    for (const [key, users] of post.reactions.entries()) {
-      post.reactions.set(key, users.filter((id) => id !== userId));
+    // ✅ Remove user from all emojis to allow only one reaction
+    for (const key in reactions) {
+      if (Array.isArray(reactions[key])) {
+        reactions[key] = reactions[key].filter((id) => id !== userId);
+      }
     }
 
     if (action === "add") {
-      const users = post.reactions.get(emoji) || [];
-      post.reactions.set(emoji, [...users, userId]);
+      if (!Array.isArray(reactions[emoji])) {
+        reactions[emoji] = [];
+      }
+      reactions[emoji].push(userId);
 
       if (post.user.toString() !== userId) {
-        await notify(post.user, userId, "reaction", `${req.user.name} reacted ${emoji} to your post`);
+        await notify(
+          post.user,
+          userId,
+          "reaction",
+          `${req.user.name} reacted ${emoji} to your post`
+        );
       }
     } else if (action === "remove") {
-      const users = post.reactions.get(emoji) || [];
-      post.reactions.set(emoji, users.filter((id) => id !== userId));
+      // Already removed above
     } else {
       return res.status(400).json({ message: "Invalid action" });
     }
 
-    // Clean up empty emojis
-    for (const [emoji, users] of post.reactions.entries()) {
-      if (users.length === 0) {
-        post.reactions.delete(emoji);
+    // ✅ Clean up empty emoji arrays
+    for (const key in reactions) {
+      if (reactions[key].length === 0) {
+        delete reactions[key];
       }
     }
 
-    post.reactions = Object.fromEntries(post.reactions);
+    post.reactions = reactions;
     await post.save();
 
     const updated = await post
