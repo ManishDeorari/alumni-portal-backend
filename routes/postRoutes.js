@@ -15,7 +15,9 @@ const {
   editComment,
 } = require("../src/api/posts/postController");
 
-// ---------------- GET POSTS ----------------
+const Post = require("../models/Post"); // Required for GET /posts/:id
+
+// ---------------- GET ALL POSTS ----------------
 router.get("/", getPosts);
 
 // ---------------- CREATE POST ----------------
@@ -39,8 +41,8 @@ router.put("/:postId/comment/:commentId", auth, editComment);
 // ---------------- DELETE COMMENT ----------------
 router.delete("/:postId/comment/:commentId", auth, deleteComment);
 
-// ---------------- POST DETAIL (Optional - Keep for full modal) ----------------
-router.get("/posts/:id", async (req, res) => {
+// ---------------- GET SINGLE POST (For Modal/View Full Thread) ----------------
+router.get("/:id", async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
       .populate("user", "name profilePic")
@@ -51,13 +53,15 @@ router.get("/posts/:id", async (req, res) => {
 
     res.json(post);
   } catch (error) {
-    console.error("GET /posts/:id error:", error.message);
+    console.error("GET /:id error:", error.message);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// ---------------- EDIT + DELETE POST (No changes) ----------------
+// ---------------- EDIT POST ----------------
 router.patch("/:id", auth, editPost);
+
+// ---------------- DELETE POST ----------------
 router.delete("/:id", auth, deletePost);
 
 module.exports = router;
