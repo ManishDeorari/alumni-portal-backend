@@ -1,51 +1,60 @@
 const Post = require("../../../../models/Post");
 
-const reactToPost = async (req, res) => {
-  try {
-    const { emoji, action } = req.body;
-    const post = await Post.findById(req.params.id);
-    const userId = req.user._id.toString();
+const Post = require("../../../../models/Post");
 
+module.exports = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { emoji, action } = req.body;
+    const userId = req.user._id;
+
+    if (!emoji) return res.status(400).json({ message: "Emoji is required" });
+
+    const post = await Post.findById(id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    if (typeof post.reactions !== "object" || post.reactions === null) {
-      post.reactions = {};
+    if (!post.reactions) post.reactions = new Map();
+
+    // Convert to Map if needed (in case it's a plain object)
+    if (!(post.reactions instanceof Map)) {
+      post.reactions = new Map(Object.entries(post.reactions));
     }
 
+    // Remove reaction logic
     if (action === "remove") {
-      if (!Array.isArray(post.reactions[emoji])) {
-        post.reactions[emoji] = [];
-      }
-      post.reactions[emoji] = post.reactions[emoji].filter((id) => id !== userId);
-      if (post.reactions[emoji].length === 0) delete post.reactions[emoji];
-    } else {
-      Object.keys(post.reactions).forEach((key) => {
-        if (!Array.isArray(post.reactions[key])) {
-          post.reactions[key] = [];
+      for (let [key, userList] of post.reactions.entries()) {
+        const updated = userList.filter((uid) => uid.toString() !== userId.toString());
+        if (updated.length > 0) {
+          post.reactions.set(key, updated);
+        } else {
+          post.reactions.delete(key);
         }
-        post.reactions[key] = post.reactions[key].filter((id) => id !== userId);
-        if (post.reactions[key].length === 0) delete post.reactions[key];
-      });
-
-      if (!Array.isArray(post.reactions[emoji])) {
-        post.reactions[emoji] = [];
       }
 
-      post.reactions[emoji].push(userId);
+      await post.save();
+      return res.json({ message: "Reaction removed", reactions: Object.fromEntries(post.reactions) });
     }
+
+    // Replace previous reaction (if any)
+    for (let [key, userList] of post.reactions.entries()) {
+      const updated = userList.filter((uid) => uid.toString() !== userId.toString());
+      if (updated.length > 0) {
+        post.reactions.set(key, updated);
+      } else {
+        post.reactions.delete(key);
+      }
+    }
+
+    // Add new emoji reaction
+    const users = post.reactions.get(emoji) || [];
+    if (!users.includes(userId)) users.push(userId);
+    post.reactions.set(emoji, users);
 
     await post.save();
 
-    const updatedPost = await Post.findById(post._id)
-      .populate("author", "fullName profilePic")
-      .populate("comments.user", "fullName profilePic");
-
-    req.io.emit("postUpdated", updatedPost);
-    res.status(200).json(updatedPost);
+    res.json({ message: "Reaction added", reactions: Object.fromEntries(post.reactions) });
   } catch (error) {
-    console.error("React error:", error);
-    res.status(500).json({ message: "Failed to react" });
+    console.error("Error in reactToPost:", error.message);
+    res.status(500).json({ message: "Server error" });
   }
 };
-
-module.exports = reactToPost;
