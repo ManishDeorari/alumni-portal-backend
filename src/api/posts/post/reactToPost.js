@@ -1,7 +1,5 @@
 const Post = require("../../../../models/Post");
 
-const Post = require("../../../../models/Post");
-
 module.exports = async (req, res) => {
   try {
     const { id } = req.params;
