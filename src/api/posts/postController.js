@@ -75,10 +75,12 @@ const getPosts = async (req, res) => {
 // ✅ Like Post
 const likePost = async (req, res) => {
   try {
+    console.log("🔐 Like requested by:", req.user);
+
     const post = await Post.findById(req.params.id);
     const userId = req.user._id.toString();
-    if (!post) return res.status(404).json({ message: "Post not found" });
 
+    if (!post) return res.status(404).json({ message: "Post not found" });
     if (!Array.isArray(post.likes)) post.likes = [];
 
     const alreadyLiked = post.likes.includes(userId);
@@ -90,21 +92,26 @@ const likePost = async (req, res) => {
         await notify(post.user, userId, "like", `${req.user.name} liked your post`);
       }
     }
-console.log("🔐 Like requested by:", req.user);
+
     await post.save();
 
-    const updated = await post
+    // ✅ Refetch with populate AFTER save
+    const updated = await Post.findById(post._id)
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
       .populate({ path: "comments.replies.user", select: "name profilePic" })
       .lean();
 
-    req.io.emit("postUpdated", updated);
-    req.io.emit("postLiked", { postId: post._id, userId }); // 🔄 Real-time like animation support
+    req.io.emit("postUpdated", updated); // For live update
+    req.io.emit("postLiked", { postId: post._id, userId }); // For animation
 
     res.json(updated);
   } catch (err) {
-    console.error("❌ Like failed:", { postId: req.params.id, user: req.user._id, error: err });
+    console.error("❌ Like failed:", {
+      postId: req.params.id,
+      user: req.user._id,
+      error: err,
+    });
     res.status(500).json({ message: "Like action failed" });
   }
 };
