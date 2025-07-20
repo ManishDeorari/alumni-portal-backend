@@ -267,8 +267,8 @@ const reactToPost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // ✅ Ensure reactions is a plain object with array values
-    let reactions = {};
+    // Normalize reactions to object of arrays
+    const reactions = {};
     if (post.reactions instanceof Map) {
       for (const [key, value] of post.reactions.entries()) {
         reactions[key] = Array.isArray(value) ? value : [];
@@ -284,7 +284,7 @@ const reactToPost = async (req, res) => {
       }
     }
 
-    // ✅ Remove this user from all emojis
+    // ✅ Remove user from all existing emoji reactions first
     for (const key in reactions) {
       if (Array.isArray(reactions[key])) {
         reactions[key] = reactions[key].filter((id) => id !== userId);
@@ -293,25 +293,26 @@ const reactToPost = async (req, res) => {
 
     if (action === "add") {
       if (!reactions[emoji]) reactions[emoji] = [];
-      if (!reactions[emoji].includes(userId)) {
-        reactions[emoji].push(userId);
+      reactions[emoji].push(userId);
 
-        if (post.user.toString() !== userId) {
-          await notify(
-            post.user,
-            userId,
-            "reaction",
-            `${req.user.name} reacted ${emoji} to your post`
-          );
-        }
+      // Optional notify
+      if (post.user.toString() !== userId) {
+        await notify(
+          post.user,
+          userId,
+          "reaction",
+          `${req.user.name} reacted ${emoji} to your post`
+        );
       }
+    } else if (action === "remove") {
+      // reaction already removed in loop above, nothing more needed
+    } else {
+      return res.status(400).json({ message: "Invalid action" });
     }
 
-    // ✅ Clean up empty reactions
+    // ✅ Clean up empty arrays
     for (const key in reactions) {
-      if (reactions[key].length === 0) {
-        delete reactions[key];
-      }
+      if (reactions[key].length === 0) delete reactions[key];
     }
 
     post.reactions = reactions;
