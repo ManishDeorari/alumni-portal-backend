@@ -267,37 +267,30 @@ const reactToPost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // ✅ Convert to plain object if needed
-    let reactions = post.reactions || {};
+    let reactions = { ...(post.reactions || {}) };
 
-    // ✅ Remove user from all emojis to allow only one reaction
+    // Remove this user from all previous emoji reactions
     for (const key in reactions) {
-      if (Array.isArray(reactions[key])) {
-        reactions[key] = reactions[key].filter((id) => id !== userId);
-      }
+      reactions[key] = reactions[key].filter((id) => id !== userId);
     }
 
     if (action === "add") {
-      if (!Array.isArray(reactions[emoji])) {
-        reactions[emoji] = [];
-      }
-      reactions[emoji].push(userId);
+      if (!reactions[emoji]) reactions[emoji] = [];
+      if (!reactions[emoji].includes(userId)) {
+        reactions[emoji].push(userId);
 
-      if (post.user.toString() !== userId) {
-        await notify(
-          post.user,
-          userId,
-          "reaction",
-          `${req.user.name} reacted ${emoji} to your post`
-        );
+        if (post.user.toString() !== userId) {
+          await notify(
+            post.user,
+            userId,
+            "reaction",
+            `${req.user.name} reacted ${emoji} to your post`
+          );
+        }
       }
-    } else if (action === "remove") {
-      // Already removed above
-    } else {
-      return res.status(400).json({ message: "Invalid action" });
     }
 
-    // ✅ Clean up empty emoji arrays
+    // Clean up empty emoji arrays
     for (const key in reactions) {
       if (reactions[key].length === 0) {
         delete reactions[key];
