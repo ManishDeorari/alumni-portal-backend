@@ -15,6 +15,22 @@ const {
   editComment,
 } = require("../src/api/posts/postController");
 
+// Assuming Express
+router.get("/posts/:id", async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+      .populate("author", "fullName profilePic") // Optional
+      .populate("comments.user", "fullName profilePic"); // Optional
+
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    res.json(post);
+  } catch (error) {
+    console.error("GET /posts/:id error:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 router.get("/", getPosts);
 router.post("/", auth, createPost);
 router.patch("/:id/like", auth, likePost);
