@@ -72,87 +72,57 @@ const getPosts = async (req, res) => {
   }
 };
 
-// ✅ Like Post
+// ---------------- LIKE POST ----------------
 const likePost = async (req, res) => {
   try {
-    console.log("🔐 Like requested by:", req.user);
-
     const post = await Post.findById(req.params.id);
-    const userId = req.user._id.toString();
+    const userId = req.user._id;
 
-    if (!post) return res.status(404).json({ message: "Post not found" });
-    if (!Array.isArray(post.likes)) post.likes = [];
-
-    const alreadyLiked = post.likes.includes(userId);
-    if (alreadyLiked) {
-      post.likes = post.likes.filter((id) => id !== userId);
+    const index = post.likes.indexOf(userId);
+    if (index > -1) {
+      post.likes.splice(index, 1);
     } else {
       post.likes.push(userId);
-      if (post.user.toString() !== userId) {
-        await notify(post.user, userId, "like", `${req.user.name} liked your post`);
-      }
     }
 
     await post.save();
+    const updatedPost = await Post.findById(post._id)
+      .populate("author", "fullName profilePic")
+      .populate("comments.user", "fullName profilePic");
 
-    // ✅ Refetch with populate AFTER save
-    const updated = await Post.findById(post._id)
-      .populate("user", "name profilePic")
-      .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" })
-      .lean();
-
-    req.io.emit("postUpdated", updated); // For live update
-    req.io.emit("postLiked", {
-      postId: post._id,
-      userId,
-      isLiked: !alreadyLiked, // this will be false if unliking
-    });
-
-    res.json(updated);
-  } catch (err) {
-    console.error("❌ Like failed:", {
-      postId: req.params.id,
-      user: req.user._id,
-      error: err,
-    });
-    res.status(500).json({ message: "Like action failed" });
+    req.io.emit("postUpdated", updatedPost); // real-time update
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error("Like post error:", error.message);
+    res.status(500).json({ message: "Failed to like post" });
   }
 };
 
-// ✅ Comment on Post
+// ---------------- COMMENT ON POST ----------------
 const commentPost = async (req, res) => {
   try {
-    const { text } = req.body;
-    if (!text || text.trim() === "")
-      return res.status(400).json({ message: "Comment text is required" });
-
     const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ message: "Post not found" });
+    const { text } = req.body;
+    const userId = req.user._id;
 
-    post.comments.push({
-      user: req.user._id,
-      text: text.trim(),
+    const comment = {
+      user: userId,
+      text,
       createdAt: new Date(),
-    });
+    };
 
-    if (post.user.toString() !== req.user._id.toString()) {
-      await notify(post.user, req.user._id, "comment", `${req.user.name} commented on your post`);
-    }
-
+    post.comments.push(comment);
     await post.save();
 
-    const updated = await post
-      .populate("user", "name profilePic")
-      .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" })
-      .lean();
+    const updatedPost = await Post.findById(post._id)
+      .populate("author", "fullName profilePic")
+      .populate("comments.user", "fullName profilePic");
 
-    req.io.emit("postUpdated", updated);
-    res.json(updated);
-  } catch (err) {
-    console.error("❌ Comment failed:", err);
-    res.status(500).json({ message: "Comment failed" });
+    req.io.emit("postUpdated", updatedPost); // real-time comment update
+    res.status(201).json(updatedPost.comments);
+  } catch (error) {
+    console.error("Comment error:", error.message);
+    res.status(500).json({ message: "Failed to comment" });
   }
 };
 
@@ -258,77 +228,43 @@ const editComment = async (req, res) => {
   }
 };
 
-// ✅ React to Post
+// ---------------- REACT TO POST ----------------
 const reactToPost = async (req, res) => {
   try {
     const { emoji, action } = req.body;
+    const post = await Post.findById(req.params.id);
     const userId = req.user._id.toString();
 
-    const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ message: "Post not found" });
+    if (!post.reactions) post.reactions = {};
 
-    // Normalize reactions to object of arrays
-    const reactions = {};
-    if (post.reactions instanceof Map) {
-      for (const [key, value] of post.reactions.entries()) {
-        reactions[key] = Array.isArray(value) ? value : [];
+    if (action === "remove") {
+      if (post.reactions[emoji]) {
+        post.reactions[emoji] = post.reactions[emoji].filter((id) => id !== userId);
+        if (post.reactions[emoji].length === 0) delete post.reactions[emoji];
       }
-    } else if (typeof post.reactions === "object") {
-      for (const key in post.reactions) {
-        const val = post.reactions[key];
-        reactions[key] = Array.isArray(val)
-          ? val
-          : typeof val === "string"
-          ? [val]
-          : [];
-      }
-    }
-
-    // ✅ Remove user from all existing emoji reactions first
-    for (const key in reactions) {
-      if (Array.isArray(reactions[key])) {
-        reactions[key] = reactions[key].filter((id) => id !== userId);
-      }
-    }
-
-    if (action === "add") {
-      if (!reactions[emoji]) reactions[emoji] = [];
-      reactions[emoji].push(userId);
-
-      // Optional notify
-      if (post.user.toString() !== userId) {
-        await notify(
-          post.user,
-          userId,
-          "reaction",
-          `${req.user.name} reacted ${emoji} to your post`
-        );
-      }
-    } else if (action === "remove") {
-      // reaction already removed in loop above, nothing more needed
     } else {
-      return res.status(400).json({ message: "Invalid action" });
+      // Remove existing reactions by this user
+      Object.keys(post.reactions).forEach((key) => {
+        post.reactions[key] = post.reactions[key].filter((id) => id !== userId);
+        if (post.reactions[key].length === 0) delete post.reactions[key];
+      });
+
+      // Add new emoji
+      if (!post.reactions[emoji]) post.reactions[emoji] = [];
+      post.reactions[emoji].push(userId);
     }
 
-    // ✅ Clean up empty arrays
-    for (const key in reactions) {
-      if (reactions[key].length === 0) delete reactions[key];
-    }
-
-    post.reactions = reactions;
     await post.save();
 
-    const updated = await Post.findById(post._id)
-      .populate("user", "name profilePic")
-      .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" })
-      .lean();
+    const updatedPost = await Post.findById(post._id)
+      .populate("author", "fullName profilePic")
+      .populate("comments.user", "fullName profilePic");
 
-    req.io.emit("postUpdated", updated);
-    res.json(updated);
-  } catch (err) {
-    console.error("❌ Reaction failed:", err);
-    res.status(500).json({ message: "Reaction failed" });
+    req.io.emit("postUpdated", updatedPost); // real-time reaction update
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error("React error:", error.message);
+    res.status(500).json({ message: "Failed to react" });
   }
 };
 
