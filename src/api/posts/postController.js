@@ -307,7 +307,7 @@ const reactToPost = async (req, res) => {
     post.reactions = reactions;
     await post.save();
 
-    const updated = await post
+    const updated = await Post.findById(post._id)
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
       .populate({ path: "comments.replies.user", select: "name profilePic" })
