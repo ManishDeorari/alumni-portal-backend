@@ -29,13 +29,6 @@ module.exports = async (req, res) => {
     post.reactions = reactions;
     await post.save();
 
-    const io = req.app.get("io"); // ✅ Get socket.io instance
-
-    io.emit("post:reaction", {
-      postId: post._id.toString(),
-      reactions: Object.fromEntries(post.reactions),
-    });
-
     return res.status(200).json({
       message: "Reaction updated",
       reactions: Object.fromEntries(post.reactions),
