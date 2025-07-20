@@ -267,11 +267,28 @@ const reactToPost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    let reactions = { ...(post.reactions || {}) };
+    // ✅ Ensure reactions is a plain object with array values
+    let reactions = {};
+    if (post.reactions instanceof Map) {
+      for (const [key, value] of post.reactions.entries()) {
+        reactions[key] = Array.isArray(value) ? value : [];
+      }
+    } else if (typeof post.reactions === "object") {
+      for (const key in post.reactions) {
+        const val = post.reactions[key];
+        reactions[key] = Array.isArray(val)
+          ? val
+          : typeof val === "string"
+          ? [val]
+          : [];
+      }
+    }
 
-    // Remove this user from all previous emoji reactions
+    // ✅ Remove this user from all emojis
     for (const key in reactions) {
-      reactions[key] = reactions[key].filter((id) => id !== userId);
+      if (Array.isArray(reactions[key])) {
+        reactions[key] = reactions[key].filter((id) => id !== userId);
+      }
     }
 
     if (action === "add") {
@@ -290,7 +307,7 @@ const reactToPost = async (req, res) => {
       }
     }
 
-    // Clean up empty emoji arrays
+    // ✅ Clean up empty reactions
     for (const key in reactions) {
       if (reactions[key].length === 0) {
         delete reactions[key];
