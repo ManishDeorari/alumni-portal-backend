@@ -90,7 +90,7 @@ const likePost = async (req, res) => {
         await notify(post.user, userId, "like", `${req.user.name} liked your post`);
       }
     }
-
+console.log("🔐 Like requested by:", req.user);
     await post.save();
 
     const updated = await post
@@ -300,7 +300,6 @@ const reactToPost = async (req, res) => {
     res.status(500).json({ message: "Reaction failed" });
   }
 };
-
 
 // ✅ Edit Post
 const editPost = async (req, res) => {

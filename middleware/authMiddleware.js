@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User"); // ✅ Make sure this is correct
 
-module.exports = function (req, res, next) {
+module.exports = async function (req, res, next) {
   const authHeader = req.header("Authorization");
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -11,7 +12,12 @@ module.exports = function (req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_jwt_secret");
-    req.user = decoded;
+
+    // ✅ Fetch full user from DB
+    const user = await User.findById(decoded.id || decoded._id).select("name profilePic");
+    if (!user) return res.status(401).json({ message: "User not found" });
+
+    req.user = user;
     next();
   } catch (err) {
     console.error("Auth Middleware Error:", err.message);
