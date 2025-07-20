@@ -2,57 +2,36 @@ const Post = require("../../../../models/Post");
 
 module.exports = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { emoji, action } = req.body;
+    const { postId } = req.params;
+    const { emoji } = req.body;
     const userId = req.user._id;
 
-    if (!emoji) return res.status(400).json({ message: "Emoji is required" });
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ error: "Post not found" });
 
-    const post = await Post.findById(id);
-    if (!post) return res.status(404).json({ message: "Post not found" });
+    let reactions = post.reactions || new Map();
 
-    if (!post.reactions) post.reactions = new Map();
+    let userAlreadyReacted = false;
 
-    // Convert to Map if needed (in case it's a plain object)
-    if (!(post.reactions instanceof Map)) {
-      post.reactions = new Map(Object.entries(post.reactions));
+    // Step 1: Remove user from all emoji arrays
+    for (const [key, userIds] of reactions.entries()) {
+      const filtered = userIds.filter(id => id.toString() !== userId.toString());
+      if (filtered.length !== userIds.length) userAlreadyReacted = key === emoji;
+      reactions.set(key, filtered);
     }
 
-    // Remove reaction logic
-    if (action === "remove") {
-      for (let [key, userList] of post.reactions.entries()) {
-        const updated = userList.filter((uid) => uid.toString() !== userId.toString());
-        if (updated.length > 0) {
-          post.reactions.set(key, updated);
-        } else {
-          post.reactions.delete(key);
-        }
-      }
-
-      await post.save();
-      return res.json({ message: "Reaction removed", reactions: Object.fromEntries(post.reactions) });
+    // Step 2: If it was an undo (same emoji clicked again), skip re-adding
+    if (!userAlreadyReacted) {
+      const current = reactions.get(emoji) || [];
+      reactions.set(emoji, [...current, userId]);
     }
 
-    // Replace previous reaction (if any)
-    for (let [key, userList] of post.reactions.entries()) {
-      const updated = userList.filter((uid) => uid.toString() !== userId.toString());
-      if (updated.length > 0) {
-        post.reactions.set(key, updated);
-      } else {
-        post.reactions.delete(key);
-      }
-    }
-
-    // Add new emoji reaction
-    const users = post.reactions.get(emoji) || [];
-    if (!users.includes(userId)) users.push(userId);
-    post.reactions.set(emoji, users);
-
+    post.reactions = reactions;
     await post.save();
 
-    res.json({ message: "Reaction added", reactions: Object.fromEntries(post.reactions) });
+    return res.status(200).json({ message: "Reaction updated", reactions: post.reactions });
   } catch (error) {
-    console.error("Error in reactToPost:", error.message);
-    res.status(500).json({ message: "Server error" });
+    console.error("Reaction error:", error);
+    return res.status(500).json({ error: "Server error" });
   }
 };
