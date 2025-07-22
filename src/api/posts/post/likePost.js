@@ -8,28 +8,40 @@ const likePost = async (req, res) => {
     const userId = req.user._id.toString();
 
     if (!Array.isArray(post.likes)) {
-      post.likes = []; // safety fallback
+      post.likes = []; // fallback to empty
     }
 
-    const index = post.likes.findIndex(id => id.toString() === userId);
+    const index = post.likes.findIndex((id) => id.toString() === userId);
 
     if (index > -1) {
-      post.likes.splice(index, 1); // Remove like
+      post.likes.splice(index, 1); // undo like
     } else {
-      post.likes.push(userId); // Add like
+      post.likes.push(userId); // like
     }
 
     await post.save();
 
+    // Fetch fresh with populated fields safely
     const updatedPost = await Post.findById(post._id)
-      .populate("author", "fullName profilePic")
-      .populate("comments.user", "fullName profilePic");
+      .populate({ path: "author", select: "fullName profilePic" })
+      .populate({ path: "comments.user", select: "fullName profilePic" })
+      .lean();
 
-    req.io.emit("postUpdated", updatedPost);
-    res.status(200).json(updatedPost); // ✅ includes updated likes array
+    if (!updatedPost) {
+      return res.status(404).json({ message: "Post not found after update" });
+    }
+
+    // Optional: wrap socket in try-catch
+    try {
+      req.io.emit("postUpdated", updatedPost);
+    } catch (socketErr) {
+      console.warn("Socket emit failed:", socketErr.message);
+    }
+
+    res.status(200).json(updatedPost);
   } catch (error) {
-    console.error("Like post error:", error.message);
-    res.status(500).json({ message: "Failed to like post" });
+    console.error("Like post error:", error);
+    res.status(500).json({ message: "Failed to like post", error: error.message });
   }
 };
 
