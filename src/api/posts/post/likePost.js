@@ -33,11 +33,7 @@ const likePost = async (req, res) => {
 
     try {
       if (req.io) {
-        req.io.emit("postLiked", {
-          postId: post._id.toString(),
-          userId,
-          isLiked: index === -1,
-        });
+        req.io.emit("postLiked", updatedPost); // emit the full updated post
       }
     } catch (e) {
       console.warn("Socket emit failed:", e.message);
