@@ -28,20 +28,22 @@ const likePost = async (req, res) => {
 
     await post.save();
 
-    // ✅ 4. Refetch and populate full post for socket + response
     const updatedPost = await Post.findById(post._id)
-      .populate({ path: "user", select: "fullName profilePic" })
-      .populate({ path: "likes", select: "_id fullName profilePic" })
-      .populate({ path: "comments.user", select: "fullName profilePic" })
-      //.lean();
+    .populate({ path: "user", select: "fullName profilePic" })
+    .populate({ path: "likes", select: "_id fullName profilePic" })
+    .populate({ path: "comments.user", select: "fullName profilePic" });
 
-    // ✅ 5. Emit updated post to all connected clients
-    try {
-      if (req.io) {
-        req.io.emit("postLiked", updatedPost); // ✅ full post emitted
-      }
-    } catch (e) {
-      console.warn("⚠️ Socket emit failed:", e.message);
+    const plainPost = updatedPost.toObject(); // ✅ ensure populated data is retained
+
+    // OPTIONAL: console.log to verify
+    console.log("✅ Emitting postLiked with:", {
+      user: plainPost.user,
+      likes: plainPost.likes.map(l => l.fullName),
+    });
+
+    // Emit the *fully populated plain JS object*
+    if (req.io) {
+      req.io.emit("postLiked", plainPost);
     }
 
     // ✅ 6. Return updated post
