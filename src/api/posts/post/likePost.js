@@ -26,7 +26,7 @@ const likePost = async (req, res) => {
     await post.save();
 
     const updatedPost = await Post.findById(post._id)
-    .populate({ path: "author", select: "fullName profilePic" })
+    .populate({ path: "user", select: "fullName profilePic" }) // ✅ FIXED
     .populate({ path: "comments.user", select: "fullName profilePic" })
     .populate({ path: "likes", select: "_id fullName profilePic" }) // ✅ Here
     .lean();
@@ -49,7 +49,7 @@ const likePost = async (req, res) => {
       likes: post.likes.map((id) => id.toString()),
       currentUser: userId,
     });
-    
+
   } catch (error) {
     console.error("Like post error:", error.message);
     res.status(500).json({ message: "Failed to like post", error: error.message });
