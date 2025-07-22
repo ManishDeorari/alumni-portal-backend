@@ -29,11 +29,14 @@ const likePost = async (req, res) => {
     await post.save();
 
     const updatedPost = await Post.findById(post._id)
-    .populate({ path: "user", select: "fullName profilePic" })
-    .populate({ path: "likes", select: "_id fullName profilePic" })
-    .populate({ path: "comments.user", select: "fullName profilePic" });
+      .populate({ path: "user", select: "name profilePicture" })
+      .populate({ path: "likes", select: "_id name profilePicture" })
+      .populate({ path: "comments.user", select: "name profilePicture" })
+      .exec();
 
     const plainPost = updatedPost.toObject(); // ✅ ensure populated data is retained
+    console.log("✅ Emitting postLiked with user:", plainPost.user);
+    console.log("✅ Emitting postLiked with likes:", plainPost.likes);
 
     // OPTIONAL: console.log to verify
     console.log("✅ Emitting postLiked with:", {
