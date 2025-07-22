@@ -26,9 +26,10 @@ const likePost = async (req, res) => {
     await post.save();
 
     const updatedPost = await Post.findById(post._id)
-      .populate("user", "fullName profilePic")
-      .populate("comments.user", "fullName profilePic")
-      .lean();
+    .populate({ path: "author", select: "fullName profilePic" })
+    .populate({ path: "comments.user", select: "fullName profilePic" })
+    .populate({ path: "likes", select: "_id fullName profilePic" }) // ✅ Here
+    .lean();
 
     try {
       if (req.io) {
@@ -43,6 +44,12 @@ const likePost = async (req, res) => {
     }
 
     res.status(200).json(updatedPost);
+
+    console.log("✅ Like updated:", {
+      likes: post.likes.map((id) => id.toString()),
+      currentUser: userId,
+    });
+    
   } catch (error) {
     console.error("Like post error:", error.message);
     res.status(500).json({ message: "Failed to like post", error: error.message });
