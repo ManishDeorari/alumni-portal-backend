@@ -33,7 +33,7 @@ const likePost = async (req, res) => {
       .populate({ path: "user", select: "fullName profilePic" })
       .populate({ path: "likes", select: "_id fullName profilePic" })
       .populate({ path: "comments.user", select: "fullName profilePic" })
-      .lean();
+      //.lean();
 
     // ✅ 5. Emit updated post to all connected clients
     try {
