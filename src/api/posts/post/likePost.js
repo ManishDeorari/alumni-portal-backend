@@ -2,45 +2,49 @@ const Post = require("../../../../models/Post");
 
 const likePost = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      console.warn("❌ No user found in request");
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const userId = req.user._id.toString();
+    console.log("👤 Like requested by:", userId);
+
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const userId = req.user._id.toString();
-
-    if (!Array.isArray(post.likes)) {
-      post.likes = []; // fallback to empty
-    }
+    if (!Array.isArray(post.likes)) post.likes = [];
 
     const index = post.likes.findIndex((id) => id.toString() === userId);
 
     if (index > -1) {
-      post.likes.splice(index, 1); // undo like
+      post.likes.splice(index, 1); // Unlike
     } else {
-      post.likes.push(userId); // like
+      post.likes.push(userId); // Like
     }
 
     await post.save();
 
-    // Fetch fresh with populated fields safely
     const updatedPost = await Post.findById(post._id)
-      .populate({ path: "author", select: "fullName profilePic" })
-      .populate({ path: "comments.user", select: "fullName profilePic" })
+      .populate("user", "fullName profilePic")
+      .populate("comments.user", "fullName profilePic")
       .lean();
 
-    if (!updatedPost) {
-      return res.status(404).json({ message: "Post not found after update" });
-    }
-
-    // Optional: wrap socket in try-catch
     try {
-      req.io.emit("postUpdated", updatedPost);
-    } catch (socketErr) {
-      console.warn("Socket emit failed:", socketErr.message);
+      if (req.io) {
+        req.io.emit("postLiked", {
+          postId: post._id.toString(),
+          userId,
+          isLiked: index === -1,
+        });
+      }
+    } catch (e) {
+      console.warn("Socket emit failed:", e.message);
     }
 
     res.status(200).json(updatedPost);
   } catch (error) {
-    console.error("Like post error:", error);
+    console.error("Like post error:", error.message);
     res.status(500).json({ message: "Failed to like post", error: error.message });
   }
 };
