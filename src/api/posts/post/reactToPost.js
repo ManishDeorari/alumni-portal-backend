@@ -29,22 +29,10 @@ module.exports = async (req, res) => {
     post.reactions = reactions;
     await post.save();
 
-    // Convert Map to plain object
-      const reactionsObj = Object.fromEntries(
-        [...post.reactions.entries()].map(([emoji, users]) => [emoji, users.map(id => id.toString())])
-      );
-
-      // ✅ Broadcast to all users via socket
-      const io = req.app.get("io");
-      io.emit("postReacted", {
-        postId: post._id.toString(),
-        reactions: reactionsObj,
-      });
-
-      return res.status(200).json({
-        message: "Reaction updated",
-        reactions: reactionsObj,
-      });
+    return res.status(200).json({
+      message: "Reaction updated",
+      reactions: Object.fromEntries(post.reactions),
+    });
   } catch (error) {
     console.error("Reaction error:", error);
     return res.status(500).json({ error: "Server error" });
