@@ -5,7 +5,6 @@ const auth = require("../middleware/authMiddleware");
 const {
   getPosts,
   createPost,
-  likePost,
   reactToPost,
   commentPost,
   replyToComment,
@@ -22,9 +21,6 @@ router.get("/", getPosts);
 
 // ---------------- CREATE POST ----------------
 router.post("/", auth, createPost);
-
-// ---------------- LIKE POST ----------------
-router.patch("/:id/like", auth, likePost);
 
 // ---------------- REACT TO POST ----------------
 router.patch("/:id/react", auth, reactToPost);

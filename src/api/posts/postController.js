@@ -1,7 +1,6 @@
 module.exports = {
   createPost: require("./post/createPost"),
   getPosts: require("./post/getPosts"),
-  likePost: require("./post/likePost"),
   commentPost: require("./comment/commentPost"),
   replyToComment: require("./comment/replyToComment"),
   deleteComment: require("./comment/deleteComment"),
