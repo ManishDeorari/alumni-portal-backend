@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
     // ✅ Re-fetch and populate post
     const updatedPost = await Post.findById(post._id)
       .populate({ path: "user", select: "name profilePicture" })
-      .populate({ path: "likes", select: "_id name profilePicture" })
+      //.populate({ path: "likes", select: "_id name profilePicture" })
       .populate({ path: "comments.user", select: "name profilePicture" });
 
     const plainPost = updatedPost.toJSON(); // ensures reactions is plain object

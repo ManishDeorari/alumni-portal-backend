@@ -26,6 +26,7 @@ const postSchema = new mongoose.Schema({
     url: String,
     public_id: String,
   },
+  //likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   comments: [commentSchema], // ✅ Corrected field
   reactions: {
     type: Map,
