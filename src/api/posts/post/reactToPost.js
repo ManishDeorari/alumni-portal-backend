@@ -9,53 +9,52 @@ module.exports = async (req, res) => {
     const post = await Post.findById(id);
     if (!post) return res.status(404).json({ error: "Post not found" });
 
-    // ✅ Convert reactions to plain object if needed
-    let reactions = post.reactions || {};
+    // ✅ Ensure reactions is always a Map
+    if (!(post.reactions instanceof Map)) {
+      post.reactions = new Map();
+    }
+
     let userAlreadyReacted = false;
 
-    // ✅ Remove user from all emoji entries
-    for (const key in reactions) {
-      const users = reactions[key].map((id) => id.toString());
-      const filtered = users.filter((id) => id !== userId);
+    // ✅ Remove user from all emojis
+    for (const [key, users] of post.reactions.entries()) {
+      const filtered = users.filter(
+        (id) => id.toString() !== userId
+      );
+
       if (filtered.length !== users.length && key === emoji) {
         userAlreadyReacted = true;
       }
-      reactions[key] = filtered;
+
+      post.reactions.set(key, filtered);
     }
 
-    // ✅ If not undoing, add user to new emoji
+    // ✅ If not undoing, add user to emoji array
     if (!userAlreadyReacted) {
-      if (!reactions[emoji]) reactions[emoji] = [];
-      if (!reactions[emoji].includes(userId)) {
-        reactions[emoji].push(userId);
+      const current = post.reactions.get(emoji) || [];
+      if (!current.includes(userId)) {
+        post.reactions.set(emoji, [...current, userId]);
       }
     }
 
-    // ✅ Save as plain object
-    post.reactions = reactions;
     await post.save();
 
-    // ✅ Re-fetch with populate
     const updatedPost = await Post.findById(post._id)
       .populate({ path: "user", select: "name profilePicture" })
       .populate({ path: "likes", select: "_id name profilePicture" })
       .populate({ path: "comments.user", select: "name profilePicture" })
       .exec();
 
-    const plainPost = updatedPost.toObject();
+    const plainPost = updatedPost.toJSON(); // uses your toJSON conversion
 
-    // ✅ Emit via socket
+    // ✅ Emit real-time update
     if (req.io) {
       req.io.emit("postReacted", plainPost);
-      console.log("📡 Emitted postReacted:", {
-        postId: post._id.toString(),
-        reactions: plainPost.reactions,
-      });
     }
 
     res.status(200).json(plainPost);
   } catch (error) {
-    console.error("🔥 Reaction error:", error);
+    console.error("🔥 Reaction error:", error.message);
     res.status(500).json({ error: "Server error" });
   }
 };
