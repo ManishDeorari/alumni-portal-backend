@@ -2,7 +2,7 @@ const Post = require("../../../../models/Post");
 
 const commentPost = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id);
+    const postId = req.params.id;
     const { text } = req.body;
     const userId = req.user._id;
 
@@ -12,15 +12,22 @@ const commentPost = async (req, res) => {
       createdAt: new Date(),
     };
 
+    // Add comment to post
+    const post = await Post.findById(postId);
     post.comments.push(comment);
     await post.save();
 
-    const updatedPost = await Post.findById(post._id)
-      .populate("author", "fullName profilePic")
-      .populate("comments.user", "fullName profilePic");
+    // Repopulate with full user details
+    const updatedPost = await Post.findById(postId)
+      .populate("user", "name profilePicture")
+      .populate("comments.user", "name profilePicture")
+      .populate("comments.replies.user", "name profilePicture");
 
+    // Emit socket update
     req.io.emit("postUpdated", updatedPost);
-    res.status(201).json(updatedPost.comments);
+
+    // Return full updated post (✅ Only one response!)
+    res.status(201).json(updatedPost);
   } catch (error) {
     console.error("Comment error:", error.message);
     res.status(500).json({ message: "Failed to comment" });
