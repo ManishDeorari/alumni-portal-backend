@@ -12,6 +12,7 @@ const {
   editPost,
   deletePost,
   editComment,
+  reactToComment,
 } = require("../src/api/posts/postController");
 
 const Post = require("../models/Post"); // Required for GET /posts/:id
@@ -27,6 +28,9 @@ router.patch("/:id/react", auth, reactToPost);
 
 // ---------------- COMMENT ON POST ----------------
 router.post("/:id/comment", auth, commentPost);
+
+// ---------------- REACT TO COMMENT ----------------
+router.patch("/:postId/comment/:commentId/react", auth, reactToComment);
 
 // ---------------- REPLY TO COMMENT ----------------
 router.post("/:postId/comment/:commentId/reply", auth, replyToComment);

@@ -1,3 +1,5 @@
+//const { reactToComment } = require("./comment/reactToComment");
+
 module.exports = {
   createPost: require("./post/createPost"),
   getPosts: require("./post/getPosts"),
@@ -8,4 +10,5 @@ module.exports = {
   reactToPost: require("./post/reactToPost"),
   editPost: require("./post/editPost"),
   deletePost: require("./post/deletePost"),
+  reactToComment: require("./comment/reactToComment"),
 };

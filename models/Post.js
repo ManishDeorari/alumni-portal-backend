@@ -10,7 +10,8 @@ const commentSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   text: String,
   createdAt: { type: Date, default: Date.now },
-  replies: [replySchema], // ✅ Nested replies
+  reactions: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  replies: [replySchema],
 });
 
 const postSchema = new mongoose.Schema({
