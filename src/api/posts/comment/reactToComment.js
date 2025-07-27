@@ -12,7 +12,6 @@ const reactToComment = async (req, res) => {
     const comment = post.comments.id(commentId);
     if (!comment) return res.status(404).json({ msg: "Comment not found" });
 
-    // ✅ Ensure reactions is a Map
     if (!(comment.reactions instanceof Map)) {
       comment.reactions = new Map(Object.entries(comment.reactions || {}));
     }
@@ -21,19 +20,17 @@ const reactToComment = async (req, res) => {
 
     console.log("🔄 Before update:", Object.fromEntries(comment.reactions));
 
-    // ✅ Remove user from all existing reactions
     for (const [key, users] of comment.reactions.entries()) {
       const filtered = users.filter((id) => id.toString() !== userId);
 
       if (key === emoji && filtered.length !== users.length) {
-        userAlreadyReacted = true; // user is removing the same emoji (undo)
+        userAlreadyReacted = true;
         console.log(`❌ Undo reaction "${emoji}" by user ${userId}`);
       }
 
       comment.reactions.set(key, filtered);
     }
 
-    // ✅ Add new reaction if it's not undo
     if (!userAlreadyReacted) {
       const current = comment.reactions.get(emoji) || [];
       comment.reactions.set(emoji, [...current, userId]);
@@ -45,31 +42,29 @@ const reactToComment = async (req, res) => {
     post.markModified("comments");
     await post.save();
 
-    // ✅ Re-fetch updated post
+    // ✅ Fetch fully updated post with user data
     const updatedPost = await Post.findById(postId)
       .populate("user", "name profilePic")
       .populate("comments.user", "name profilePic");
 
-    const plainPost = updatedPost.toObject(); // safer for conversion
+    // ✅ Convert all Maps ➜ Objects
+    const postObj = updatedPost.toObject();
 
-// Convert each comment.reactions Map → plain object manually
-plainPost.comments = plainPost.comments.map((c) => {
-  if (c.reactions instanceof Map) {
-    c.reactions = Object.fromEntries(c.reactions);
-  } else if (
-    c.reactions &&
-    typeof c.reactions.get === "function"
-  ) {
-    c.reactions = Object.fromEntries(c.reactions);
-  }
-  return c;
-});
+    postObj.comments = postObj.comments.map((c) => {
+      if (c.reactions instanceof Map || typeof c.reactions?.get === "function") {
+        c.reactions = Object.fromEntries(c.reactions);
+      }
+      return c;
+    });
 
+    if (postObj.reactions instanceof Map || typeof postObj.reactions?.get === "function") {
+      postObj.reactions = Object.fromEntries(postObj.reactions);
+    }
 
-    // ✅ Emit full post update (optional but already present)
-    req.io?.emit("postUpdated", plainPost);
+    // ✅ Emit updated post to all sockets
+    req.io?.emit("postUpdated", postObj);
 
-    // ✅ Emit specific comment reaction update
+    // ✅ Emit separate commentReacted event if needed
     req.io?.emit("commentReacted", {
       postId,
       commentId,
@@ -77,24 +72,9 @@ plainPost.comments = plainPost.comments.map((c) => {
       emoji,
     });
 
-    console.log("📤 Emitted: commentReacted", {
-      postId,
-      commentId,
-      userId,
-      emoji,
-    });
+    console.log("📤 Emitted postUpdated + commentReacted");
 
-    // ✅ Extract and convert the updated comment reactions
-    const updatedComment = plainPost.comments.find((c) => c._id === commentId);
-
-    if (updatedComment?.reactions instanceof Map) {
-      updatedComment.reactions = Object.fromEntries(updatedComment.reactions);
-    } else if (
-      updatedComment?.reactions &&
-      typeof updatedComment.reactions.get === "function"
-    ) {
-      updatedComment.reactions = Object.fromEntries(updatedComment.reactions);
-    }
+    const updatedComment = postObj.comments.find((c) => c._id.toString() === commentId);
 
     res.status(200).json({ comment: updatedComment });
   } catch (err) {
