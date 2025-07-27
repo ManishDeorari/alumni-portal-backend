@@ -50,7 +50,21 @@ const reactToComment = async (req, res) => {
       .populate("user", "name profilePic")
       .populate("comments.user", "name profilePic");
 
-    const plainPost = updatedPost.toJSON();
+    const plainPost = updatedPost.toObject(); // safer for conversion
+
+// Convert each comment.reactions Map → plain object manually
+plainPost.comments = plainPost.comments.map((c) => {
+  if (c.reactions instanceof Map) {
+    c.reactions = Object.fromEntries(c.reactions);
+  } else if (
+    c.reactions &&
+    typeof c.reactions.get === "function"
+  ) {
+    c.reactions = Object.fromEntries(c.reactions);
+  }
+  return c;
+});
+
 
     // ✅ Emit full post update (optional but already present)
     req.io?.emit("postUpdated", plainPost);
