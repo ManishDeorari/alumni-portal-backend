@@ -12,12 +12,14 @@ const reactToComment = async (req, res) => {
     const comment = post.comments.id(commentId);
     if (!comment) return res.status(404).json({ msg: "Comment not found" });
 
-    // ✅ Ensure reactions is a Map (Mongoose stores plain object in DB)
+    // ✅ Ensure reactions is a Map
     if (!(comment.reactions instanceof Map)) {
       comment.reactions = new Map(Object.entries(comment.reactions || {}));
     }
 
     let userAlreadyReacted = false;
+
+    console.log("🔄 Before update:", Object.fromEntries(comment.reactions));
 
     // ✅ Remove user from all existing reactions
     for (const [key, users] of comment.reactions.entries()) {
@@ -25,6 +27,7 @@ const reactToComment = async (req, res) => {
 
       if (key === emoji && filtered.length !== users.length) {
         userAlreadyReacted = true; // user is removing the same emoji (undo)
+        console.log(`❌ Undo reaction "${emoji}" by user ${userId}`);
       }
 
       comment.reactions.set(key, filtered);
@@ -34,26 +37,48 @@ const reactToComment = async (req, res) => {
     if (!userAlreadyReacted) {
       const current = comment.reactions.get(emoji) || [];
       comment.reactions.set(emoji, [...current, userId]);
+      console.log(`✅ Added reaction "${emoji}" by user ${userId}`);
     }
 
-    // ✅ Ensure Mongoose detects subdocument modification
-    post.markModified("comments");
+    console.log("✅ After update:", Object.fromEntries(comment.reactions));
 
+    post.markModified("comments");
     await post.save();
 
-    // ✅ Re-fetch updated post with user data for emit and response
+    // ✅ Re-fetch updated post
     const updatedPost = await Post.findById(postId)
       .populate("user", "name profilePic")
       .populate("comments.user", "name profilePic");
 
     const plainPost = updatedPost.toJSON();
 
-    // ✅ Emit updated post to sockets
+    // ✅ Emit full post update (optional but already present)
     req.io?.emit("postUpdated", plainPost);
 
-    // ✅ Extract and convert the updated comment's reactions from Map → plain object
+    // ✅ Emit specific comment reaction update
+    req.io?.emit("commentReacted", {
+      postId,
+      commentId,
+      userId,
+      emoji,
+    });
+
+    console.log("📤 Emitted: commentReacted", {
+      postId,
+      commentId,
+      userId,
+      emoji,
+    });
+
+    // ✅ Extract and convert the updated comment reactions
     const updatedComment = plainPost.comments.find((c) => c._id === commentId);
+
     if (updatedComment?.reactions instanceof Map) {
+      updatedComment.reactions = Object.fromEntries(updatedComment.reactions);
+    } else if (
+      updatedComment?.reactions &&
+      typeof updatedComment.reactions.get === "function"
+    ) {
       updatedComment.reactions = Object.fromEntries(updatedComment.reactions);
     }
 
