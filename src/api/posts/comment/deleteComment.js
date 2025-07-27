@@ -2,7 +2,6 @@ const Post = require("../../../../models/Post");
 
 const deleteComment = async (req, res) => {
   try {
-    console.log("🔐 req.user =", req.user);
     const post = await Post.findById(req.params.postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
@@ -10,12 +9,16 @@ const deleteComment = async (req, res) => {
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
     console.log("🧾 comment.user =", comment.user);
+    console.log("🔐 req.user =", req.user);
 
     if (comment.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    comment.remove();
+    // ✅ FIX: remove comment manually
+    post.comments = post.comments.filter(
+      (c) => c._id.toString() !== req.params.commentId
+    );
     await post.save();
 
     const updated = await post
