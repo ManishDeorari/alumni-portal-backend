@@ -50,7 +50,9 @@ const reactToComment = async (req, res) => {
     // Emit event
     req.io?.emit("postUpdated", plainPost);
 
-    res.status(200).json(plainPost);
+    const updatedComment = plainPost.comments.find(c => c._id === commentId);
+    res.status(200).json({ comment: updatedComment });
+
   } catch (err) {
     console.error("🔥 Comment reaction error:", err.message);
     res.status(500).json({ error: err.message });
