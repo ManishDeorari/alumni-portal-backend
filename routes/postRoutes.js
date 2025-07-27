@@ -30,7 +30,7 @@ router.patch("/:id/react", auth, reactToPost);
 router.post("/:id/comment", auth, commentPost);
 
 // ---------------- REACT TO COMMENT ----------------
-router.post("/posts/:postId/comments/:commentId/react", auth, reactToComment);
+router.post("/:postId/comments/:commentId/react", auth, reactToComment);
 
 // ---------------- REPLY TO COMMENT ----------------
 router.post("/:postId/comment/:commentId/reply", auth, replyToComment);
