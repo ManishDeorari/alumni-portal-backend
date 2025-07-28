@@ -12,6 +12,8 @@ const {
   editPost,
   deletePost,
   editComment,
+  deletePost,
+  editComment,
   reactToComment,
 } = require("../src/api/posts/postController");
 
@@ -33,13 +35,16 @@ router.post("/:id/comment", auth, commentPost);
 router.post("/:postId/comments/:commentId/react", auth, reactToComment);
 
 // ---------------- REPLY TO COMMENT ----------------
-router.post("/:postId/comments/:commentId/reply", auth, replyToComment);
+router.post("/:postId/comment/:commentId/reply", auth, replyToComment);
 
 // ---------------- EDIT COMMENT ----------------
-router.put("/:postId/comments/:commentId", auth, editComment);
+router.put("/:postId/comment/:commentId", auth, editComment);
 
 // ---------------- DELETE COMMENT ----------------
-router.delete("/:postId/comments/:commentId", auth, deleteComment);
+router.delete("/:postId/comment/:commentId", auth, deleteComment);
+
+router.put("/:postId/comments/:commentId/edit", auth, editComment);
+router.delete("/:postId/comments/:commentId/delete", auth, deleteComment);
 
 // ---------------- GET SINGLE POST (For Modal/View Full Thread) ----------------
 router.get("/:id", async (req, res) => {
