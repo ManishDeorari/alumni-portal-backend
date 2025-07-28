@@ -13,6 +13,9 @@ const {
   deletePost,
   editComment,
   reactToComment,
+  editReply,
+  deleteReply,
+  reactToReply,
 } = require("../src/api/posts/postController");
 
 const Post = require("../models/Post"); // Required for GET /posts/:id
@@ -40,6 +43,10 @@ router.put("/:postId/comment/:commentId", auth, editComment);
 
 // ---------------- DELETE COMMENT ----------------
 router.delete("/:postId/comment/:commentId", auth, deleteComment);
+
+router.put("/posts/:postId/comment/:commentId/reply/:replyId", auth, editReply);
+router.delete("/posts/:postId/comment/:commentId/reply/:replyId", auth, deleteReply);
+router.post("/posts/:postId/comment/:commentId/reply/:replyId/react", auth, reactToReply);
 
 // ---------------- GET SINGLE POST (For Modal/View Full Thread) ----------------
 router.get("/:id", async (req, res) => {
