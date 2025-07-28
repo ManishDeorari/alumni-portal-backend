@@ -10,4 +10,7 @@ module.exports = {
   editPost: require("./post/editPost"),
   deletePost: require("./post/deletePost"),
   reactToComment: require("./comment/reactToComment"),
+  reactToReply: require("./comment/reactToReply"),
+  editReply: require("./comment/editReply"),
+  deleteReply: require("./comment/deleteReply"),
 };
