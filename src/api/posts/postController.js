@@ -1,4 +1,3 @@
-//const { reactToComment } = require("./comment/reactToComment");
 
 module.exports = {
   createPost: require("./post/createPost"),

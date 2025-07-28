@@ -4,6 +4,11 @@ const replySchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   text: String,
   createdAt: { type: Date, default: Date.now },
+  reactions: {
+    type: Map,
+    of: [mongoose.Schema.Types.ObjectId],
+    default: () => new Map(),
+  },
 });
 
 const commentSchema = new mongoose.Schema({
