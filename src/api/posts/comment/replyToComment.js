@@ -3,53 +3,41 @@ const Post = require("../../../../models/Post");
 const replyToComment = async (req, res) => {
   try {
     const { text } = req.body;
-    const { postId, commentId } = req.params;
-    const userId = req.user._id;
-
     if (!text || text.trim() === "") {
       return res.status(400).json({ message: "Reply text is required" });
     }
 
-    const post = await Post.findById(postId);
+    const post = await Post.findById(req.params.postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const comment = post.comments.id(commentId);
+    const comment = post.comments.id(req.params.commentId);
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
-    // 🔒 Optional: Restrict replies only to post owner
-    const restrictRepliesToOwner = false;
-    if (restrictRepliesToOwner && post.user.toString() !== userId.toString()) {
-      return res.status(403).json({ message: "Only the post owner can reply to comments." });
-    }
-
-    // 💬 Push new reply
     comment.replies.push({
-      user: userId,
+      user: req.user._id,
       text: text.trim(),
       createdAt: new Date(),
     });
 
     await post.save();
 
-    const updatedPost = await post
+    // 🛠 Re-fetch with population after saving
+    const updated = await Post.findById(req.params.postId)
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" })
-      .lean();
+      .populate({ path: "comments.replies.user", select: "name profilePic" });
 
-    // 🔁 Emit real-time update
-    req.io.emit("postUpdated", updatedPost);
-
-    res.json(updatedPost);
+    req.io.emit("postUpdated", updated);
+    res.json(updated);
   } catch (err) {
     console.error("❌ Reply failed:", {
-  message: err.message,
-  stack: err.stack,
-  postId: req.params.postId,
-  commentId: req.params.commentId,
-  body: req.body,
-  user: req.user
-});
+      message: err.message,
+      stack: err.stack,
+      postId: req.params.postId,
+      commentId: req.params.commentId,
+      body: req.body,
+      user: req.user,
+    });
     res.status(500).json({ message: "Reply failed" });
   }
 };
