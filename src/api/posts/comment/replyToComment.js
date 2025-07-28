@@ -42,7 +42,14 @@ const replyToComment = async (req, res) => {
 
     res.json(updatedPost);
   } catch (err) {
-    console.error("❌ Reply failed:", err);
+    console.error("❌ Reply failed:", {
+  message: err.message,
+  stack: err.stack,
+  postId: req.params.postId,
+  commentId: req.params.commentId,
+  body: req.body,
+  user: req.user
+});
     res.status(500).json({ message: "Reply failed" });
   }
 };
