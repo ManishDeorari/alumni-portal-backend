@@ -21,7 +21,8 @@ const editComment = async (req, res) => {
     comment.editedAt = new Date();
     await post.save();
 
-    const updated = await post
+    // ✅ Re-fetch post to enable proper populate
+    const updated = await Post.findById(post._id)
       .populate("user", "name profilePic")
       .populate({ path: "comments.user", select: "name profilePic" })
       .populate({ path: "comments.replies.user", select: "name profilePic" })
