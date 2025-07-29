@@ -17,6 +17,7 @@ const replyToComment = async (req, res) => {
       user: req.user._id,
       text: text.trim(),
       createdAt: new Date(),
+      parentId: commentId, 
     });
 
     await post.save();
