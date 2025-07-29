@@ -20,7 +20,7 @@ const reactToReply = async (req, res) => {
       reply.reactions = new Map(Object.entries(reply.reactions || {}));
     }
 
-    // Remove any existing reaction by the user
+    // Remove existing reaction by user
     let userAlreadyReacted = false;
     for (const [key, users] of reply.reactions.entries()) {
       const filtered = users.filter((id) => id.toString() !== userId);
@@ -30,16 +30,15 @@ const reactToReply = async (req, res) => {
       reply.reactions.set(key, filtered);
     }
 
-    // If not already reacted, add the new reaction
+    // Add new reaction if not already reacted
     if (!userAlreadyReacted) {
       const current = reply.reactions.get(emoji) || [];
       reply.reactions.set(emoji, [...current, userId]);
     }
 
-    post.markModified("comments"); // since we edited a nested field
+    post.markModified("comments");
     await post.save();
 
-    // Fetch updated post and populate
     const updatedPost = await Post.findById(postId)
       .populate("user", "name profilePic")
       .populate({
@@ -48,32 +47,7 @@ const reactToReply = async (req, res) => {
           { path: "user", select: "name profilePic" },
           { path: "replies.user", select: "name profilePic" },
         ],
-      })
-      .lean(); // important for modifying structure below
-
-    // 🔁 Normalize all .reactions from Map to Object: post, comment, reply
-    if (updatedPost.reactions instanceof Map || typeof updatedPost.reactions?.get === "function") {
-      updatedPost.reactions = Object.fromEntries(updatedPost.reactions);
-    }
-
-    updatedPost.comments = updatedPost.comments.map((c) => {
-      // Fix comment-level reactions
-      if (c.reactions instanceof Map || typeof c.reactions?.get === "function") {
-        c.reactions = Object.fromEntries(c.reactions);
-      }
-
-      // Fix each reply's reactions
-      if (Array.isArray(c.replies)) {
-        c.replies = c.replies.map((r) => {
-          if (r.reactions instanceof Map || typeof r.reactions?.get === "function") {
-            r.reactions = Object.fromEntries(r.reactions);
-          }
-          return r;
-        });
-      }
-
-      return c;
-    });
+      });
 
     // Emit updated post and reply reaction info via socket
     req.io.emit("postUpdated", updatedPost);
@@ -85,7 +59,6 @@ const reactToReply = async (req, res) => {
       userId,
     });
 
-    // Send the final result
     res.json(updatedPost);
   } catch (err) {
     console.error("❌ React to reply error:", err.message);

@@ -92,15 +92,27 @@ postSchema.pre("save", function (next) {
 postSchema.methods.toJSON = function () {
   const obj = this.toObject();
 
+  // 🔁 Post reactions
   if (obj.reactions instanceof Map) {
     obj.reactions = Object.fromEntries(obj.reactions);
   }
 
+  // 🔁 Comment reactions + Reply reactions
   if (obj.comments?.length) {
     obj.comments = obj.comments.map((c) => {
       if (c.reactions instanceof Map) {
         c.reactions = Object.fromEntries(c.reactions);
       }
+
+      if (Array.isArray(c.replies)) {
+        c.replies = c.replies.map((r) => {
+          if (r.reactions instanceof Map) {
+            r.reactions = Object.fromEntries(r.reactions);
+          }
+          return r;
+        });
+      }
+
       return c;
     });
   }
