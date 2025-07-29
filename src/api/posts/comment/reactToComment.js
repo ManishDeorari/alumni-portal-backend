@@ -18,14 +18,11 @@ const reactToComment = async (req, res) => {
 
     let userAlreadyReacted = false;
 
-    console.log("🔄 Before update:", Object.fromEntries(comment.reactions));
-
     for (const [key, users] of comment.reactions.entries()) {
       const filtered = users.filter((id) => id.toString() !== userId);
 
       if (key === emoji && filtered.length !== users.length) {
         userAlreadyReacted = true;
-        console.log(`❌ Undo reaction "${emoji}" by user ${userId}`);
       }
 
       comment.reactions.set(key, filtered);
@@ -34,26 +31,35 @@ const reactToComment = async (req, res) => {
     if (!userAlreadyReacted) {
       const current = comment.reactions.get(emoji) || [];
       comment.reactions.set(emoji, [...current, userId]);
-      console.log(`✅ Added reaction "${emoji}" by user ${userId}`);
     }
-
-    console.log("✅ After update:", Object.fromEntries(comment.reactions));
 
     post.markModified("comments");
     await post.save();
 
-    // ✅ Fetch fully updated post with user data
+    // ✅ Fetch fully updated post with comment + reply users
     const updatedPost = await Post.findById(postId)
       .populate("user", "name profilePic")
-      .populate("comments.user", "name profilePic");
+      .populate({
+        path: "comments",
+        populate: [
+          { path: "user", select: "name profilePic" },
+          { path: "replies.user", select: "name profilePic" },
+        ],
+      });
 
-    // ✅ Convert all Maps ➜ Objects
     const postObj = updatedPost.toObject();
 
+    // ✅ Convert Maps ➜ plain objects for comment + replies
     postObj.comments = postObj.comments.map((c) => {
       if (c.reactions instanceof Map || typeof c.reactions?.get === "function") {
         c.reactions = Object.fromEntries(c.reactions);
       }
+      c.replies = c.replies?.map((r) => {
+        if (r.reactions instanceof Map || typeof r.reactions?.get === "function") {
+          r.reactions = Object.fromEntries(r.reactions);
+        }
+        return r;
+      });
       return c;
     });
 
@@ -61,18 +67,8 @@ const reactToComment = async (req, res) => {
       postObj.reactions = Object.fromEntries(postObj.reactions);
     }
 
-    // ✅ Emit updated post to all sockets
     req.io?.emit("postUpdated", postObj);
-
-    // ✅ Emit separate commentReacted event if needed
-    req.io?.emit("commentReacted", {
-      postId,
-      commentId,
-      userId,
-      emoji,
-    });
-
-    console.log("📤 Emitted postUpdated + commentReacted");
+    req.io?.emit("commentReacted", { postId, commentId, userId, emoji });
 
     const updatedComment = postObj.comments.find((c) => c._id.toString() === commentId);
 
