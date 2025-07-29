@@ -9,6 +9,11 @@ const replySchema = new mongoose.Schema({
     of: [mongoose.Schema.Types.ObjectId],
     default: () => new Map(),
   },
+  parentId: { // ✅ REQUIRED for correct frontend URL generation
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Comment",
+    required: true,
+  },
 });
 
 const commentSchema = new mongoose.Schema({
