@@ -39,8 +39,13 @@ const reactToReply = async (req, res) => {
 
     const updatedPost = await Post.findById(postId)
       .populate("user", "name profilePic")
-      .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" })
+      .populate({
+        path: "comments",
+        populate: [
+          { path: "user", select: "name profilePic" },
+          { path: "replies.user", select: "name profilePic" },
+        ],
+      })
       .lean();
 
     // convert Map -> Object
