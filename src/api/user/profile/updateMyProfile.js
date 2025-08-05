@@ -1,18 +1,11 @@
-const cloudinary = require("cloudinary").v2;
 const User = require("../../../../models/User");
-
-// Initialize Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+const cloudinary = require("../../../../config/cloudinary"); // ✅ Correct cloudinary config
 
 module.exports = async (req, res) => {
   try {
     const { oldImageUrl, ...updates } = req.body;
 
-    // 🧹 Delete old Cloudinary image if it exists and is not default
+    // 🧹 Delete old image if it's from Cloudinary
     if (oldImageUrl && oldImageUrl.includes("cloudinary.com")) {
       const publicId = extractPublicId(oldImageUrl);
       if (publicId) {
@@ -20,7 +13,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // ✍️ Update user in DB
+    // ✍️ Update user
     const updatedUser = await User.findByIdAndUpdate(req.user.id, updates, {
       new: true,
     }).select("-password");
@@ -32,10 +25,10 @@ module.exports = async (req, res) => {
   }
 };
 
-// 🧠 Public ID Extractor
+// 🧠 Extract Cloudinary public ID from URL
 function extractPublicId(imageUrl) {
   try {
-    const parts = imageUrl.split("/upload/")[1].split(".")[0]; // more robust
+    const parts = imageUrl.split("/upload/")[1].split(".")[0];
     return parts;
   } catch (e) {
     console.error("⚠️ Failed to extract Cloudinary public ID:", e.message);
