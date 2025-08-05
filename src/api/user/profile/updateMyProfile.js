@@ -1,11 +1,11 @@
 const User = require("../../../../models/User");
-const cloudinary = require("../../../../config/cloudinary"); // ✅ Correct cloudinary config
+const cloudinary = require("../../../../config/cloudinary");
 
 module.exports = async (req, res) => {
   try {
-    const { oldImageUrl, ...updates } = req.body;
+    const { oldImageUrl, profileImage, ...rest } = req.body;
 
-    // 🧹 Delete old image if it's from Cloudinary
+    // 🧹 Delete old Cloudinary image if present
     if (oldImageUrl && oldImageUrl.includes("cloudinary.com")) {
       const publicId = extractPublicId(oldImageUrl);
       if (publicId) {
@@ -13,7 +13,12 @@ module.exports = async (req, res) => {
       }
     }
 
-    // ✍️ Update user
+    // ✅ Update correct field in DB
+    const updates = {
+      ...rest,
+      profilePicture: profileImage, // 🔁 Map profileImage to profilePicture
+    };
+
     const updatedUser = await User.findByIdAndUpdate(req.user.id, updates, {
       new: true,
     }).select("-password");
