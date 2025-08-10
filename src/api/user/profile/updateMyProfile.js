@@ -13,10 +13,10 @@ module.exports = async (req, res) => {
       }
     }
 
-    // ✅ Update correct field in DB
+    // ✅ Ensure correct DB field
     const updates = {
       ...rest,
-      profilePicture: profileImage, // 🔁 Map profileImage to profilePicture
+      profilePicture: profileImage, // Map to DB schema
     };
 
     const updatedUser = await User.findByIdAndUpdate(req.user.id, updates, {
@@ -33,8 +33,9 @@ module.exports = async (req, res) => {
 // 🧠 Extract Cloudinary public ID from URL
 function extractPublicId(imageUrl) {
   try {
-    const parts = imageUrl.split("/upload/")[1].split(".")[0];
-    return parts;
+    const withoutUpload = imageUrl.split("/upload/")[1];
+    const publicId = withoutUpload.split(".")[0];
+    return publicId;
   } catch (e) {
     console.error("⚠️ Failed to extract Cloudinary public ID:", e.message);
     return null;
