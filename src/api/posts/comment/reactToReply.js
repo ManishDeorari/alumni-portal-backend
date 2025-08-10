@@ -40,12 +40,12 @@ const reactToReply = async (req, res) => {
     await post.save();
 
     const updatedPost = await Post.findById(postId)
-      .populate("user", "name profilePic")
+      .populate("user", "name profilePicture")
       .populate({
         path: "comments",
         populate: [
-          { path: "user", select: "name profilePic" },
-          { path: "replies.user", select: "name profilePic" },
+          { path: "user", select: "name profilePicture" },
+          { path: "replies.user", select: "name profilePicture" },
         ],
       });
 

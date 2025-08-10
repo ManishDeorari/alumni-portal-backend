@@ -25,9 +25,9 @@ const replyToComment = async (req, res) => {
     await post.save();
 
     const updated = await Post.findById(postId)
-      .populate("user", "name profilePic")
-      .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" });
+      .populate("user", "name profilePicture")
+      .populate({ path: "comments.user", select: "name profilePicture" })
+      .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
     req.io.emit("postUpdated", updated);
     res.json(updated);

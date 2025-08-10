@@ -27,9 +27,9 @@ const editReply = async (req, res) => {
     await post.save();
 
     const updated = await Post.findById(post._id)
-      .populate("user", "name profilePic")
-      .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" })
+      .populate("user", "name profilePicture")
+      .populate({ path: "comments.user", select: "name profilePicture" })
+      .populate({ path: "comments.replies.user", select: "name profilePicture" })
       .lean();
 
     req.io.emit("postUpdated", updated);
