@@ -1,3 +1,4 @@
+// /api/user/update.js
 const User = require("../../../../models/User");
 const cloudinary = require("../../../../config/cloudinary");
 
@@ -9,7 +10,7 @@ module.exports = async (req, res) => {
     if (
       oldImageUrl &&
       oldImageUrl.includes("res.cloudinary.com") &&
-      !oldImageUrl.includes("default-profile.jpg") // ✅ Don't delete default
+      !oldImageUrl.includes("default-profile.jpg")
     ) {
       const publicId = extractPublicId(oldImageUrl);
       if (publicId) {
@@ -25,7 +26,7 @@ module.exports = async (req, res) => {
     // ✅ Update user profile picture in DB
     const updates = {
       ...rest,
-      profilePicture: profileImage, // map to DB field
+      profilePicture: profileImage,
     };
 
     const updatedUser = await User.findByIdAndUpdate(req.user.id, updates, {
@@ -39,15 +40,21 @@ module.exports = async (req, res) => {
   }
 };
 
-// 🔍 Extract Cloudinary public ID (handles folders)
+// 🔍 More robust extractPublicId
 function extractPublicId(imageUrl) {
   try {
-    const parts = imageUrl.split("/upload/");
-    if (parts.length < 2) return null;
+    // Remove query params
+    imageUrl = imageUrl.split("?")[0];
 
-    const pathAndExt = parts[1];
-    const noExt = pathAndExt.substring(0, pathAndExt.lastIndexOf("."));
-    return noExt; // This works even if inside folders (e.g. "profiles/abcd1234")
+    // Find the part after /upload/
+    const afterUpload = imageUrl.split("/upload/")[1];
+    if (!afterUpload) return null;
+
+    // Remove any version number like /v123456/
+    const noVersion = afterUpload.replace(/v\d+\//, "");
+
+    // Remove file extension
+    return noVersion.substring(0, noVersion.lastIndexOf(".")) || noVersion;
   } catch (e) {
     console.error("⚠️ Failed to extract public_id:", e.message);
     return null;
