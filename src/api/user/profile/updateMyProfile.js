@@ -4,14 +4,10 @@ const cloudinary = require("../../../../config/cloudinary");
 
 module.exports = async (req, res) => {
   try {
-    const { oldImageUrl, profileImage, ...rest } = req.body;
+    const { oldImageUrl, profileImage, bannerImage, ...rest } = req.body;
 
     // 🧹 Delete old Cloudinary image if present & not default
-    if (
-      oldImageUrl &&
-      oldImageUrl.includes("res.cloudinary.com") &&
-      !oldImageUrl.includes("default-profile.jpg")
-    ) {
+    if (oldImageUrl && oldImageUrl.includes("res.cloudinary.com") && !oldImageUrl.includes("default")) {
       const publicId = extractPublicId(oldImageUrl);
       if (publicId) {
         try {
@@ -23,10 +19,11 @@ module.exports = async (req, res) => {
       }
     }
 
-    // ✅ Update user profile picture in DB
+    // ✅ Update user profile/banner in DB
     const updates = {
       ...rest,
-      profilePicture: profileImage,
+      ...(profileImage && { profilePicture: profileImage }),
+      ...(bannerImage && { bannerImage: bannerImage }),
     };
 
     const updatedUser = await User.findByIdAndUpdate(req.user.id, updates, {
@@ -35,25 +32,18 @@ module.exports = async (req, res) => {
 
     res.json(updatedUser);
   } catch (error) {
-    console.error("❌ Error updating profile:", error);
+    console.error("❌ Error updating profile/banner:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// 🔍 More robust extractPublicId
+// 🔍 Robust public_id extractor
 function extractPublicId(imageUrl) {
   try {
-    // Remove query params
-    imageUrl = imageUrl.split("?")[0];
-
-    // Find the part after /upload/
+    imageUrl = imageUrl.split("?")[0]; // remove query params
     const afterUpload = imageUrl.split("/upload/")[1];
     if (!afterUpload) return null;
-
-    // Remove any version number like /v123456/
-    const noVersion = afterUpload.replace(/v\d+\//, "");
-
-    // Remove file extension
+    const noVersion = afterUpload.replace(/v\d+\//, ""); // remove version
     return noVersion.substring(0, noVersion.lastIndexOf(".")) || noVersion;
   } catch (e) {
     console.error("⚠️ Failed to extract public_id:", e.message);
