@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
     const updates = {
       ...rest,
       ...(profileImage && { profilePicture: profileImage }),
-      ...(bannerImage && { bannerImage: bannerImage }),
+      ...(bannerImage && { bannerImage: bannerImage }),s
     };
 
     const updatedUser = await User.findByIdAndUpdate(req.user.id, updates, {
