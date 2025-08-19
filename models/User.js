@@ -29,6 +29,7 @@ const UserSchema = new mongoose.Schema({
   course: String,
   year: String,
   profilePicture: String,
+  bannerImage: String,
 
   connections: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   pendingRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
