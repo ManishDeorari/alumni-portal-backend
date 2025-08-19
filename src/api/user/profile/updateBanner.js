@@ -3,29 +3,29 @@ const cloudinary = require("../../../../config/cloudinary");
 
 module.exports = async (req, res) => {
   try {
-    const { oldImageUrl, profileImage, ...rest } = req.body;
+    const { oldImageUrl, bannerImage, ...rest } = req.body;
 
     // 🧹 Delete old Cloudinary image if present & not default
     if (
       oldImageUrl &&
       oldImageUrl.includes("res.cloudinary.com") &&
-      !oldImageUrl.includes("default-profile.jpg")
+      !oldImageUrl.includes("default-banner.jpg") // use default banner filename
     ) {
       const publicId = extractPublicId(oldImageUrl);
       if (publicId) {
         try {
           await cloudinary.uploader.destroy(publicId);
-          console.log(`🗑 Deleted old Cloudinary image: ${publicId}`);
+          console.log(`🗑 Deleted old Cloudinary banner: ${publicId}`);
         } catch (err) {
-          console.error("❌ Failed to delete old image from Cloudinary:", err);
+          console.error("❌ Failed to delete old banner from Cloudinary:", err);
         }
       }
     }
 
-    // ✅ Update user profile picture in DB
+    // ✅ Update user banner in DB
     const updates = {
       ...rest,
-      profilePicture: profileImage,
+      bannerImage: bannerImage,
     };
 
     const updatedUser = await User.findByIdAndUpdate(req.user.id, updates, {
@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
 
     res.json(updatedUser);
   } catch (error) {
-    console.error("❌ Error updating profile:", error);
+    console.error("❌ Error updating banner:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -42,17 +42,10 @@ module.exports = async (req, res) => {
 // 🔍 More robust extractPublicId
 function extractPublicId(imageUrl) {
   try {
-    // Remove query params
     imageUrl = imageUrl.split("?")[0];
-
-    // Find the part after /upload/
     const afterUpload = imageUrl.split("/upload/")[1];
     if (!afterUpload) return null;
-
-    // Remove any version number like /v123456/
     const noVersion = afterUpload.replace(/v\d+\//, "");
-
-    // Remove file extension
     return noVersion.substring(0, noVersion.lastIndexOf(".")) || noVersion;
   } catch (e) {
     console.error("⚠️ Failed to extract public_id:", e.message);

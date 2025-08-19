@@ -1,6 +1,8 @@
+
 module.exports = {
   getMyProfile: require("./profile/getMyProfile"),
   updateMyProfile: require("./profile/updateMyProfile"),
+  updateBanner: require("./profile/updateBanner"),
   getPublicProfile: require("./profile/getPublicProfile"),
   getAllUsers: require("./getUsers/getAllUsers"),
 
