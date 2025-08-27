@@ -10,13 +10,16 @@ const {
   acceptConnectionRequest,
   getPublicProfile,
   addPoints,
-  getAwardEligibleUsers
+  getAwardEligibleUsers,
+  getMyPosts,
 } = require("../src/api/user/userController");
 
 // ------- PROFILE ROUTES -------
 router.get("/me", auth, getMyProfile);
 router.put("/update", auth, updateMyProfile);
 router.get("/:id", auth, getPublicProfile);
+
+router.get("/myposts", auth, getMyPosts);
 
 // ------- CONNECTION ROUTES -------
 router.get("/all", auth, getAllUsers);
