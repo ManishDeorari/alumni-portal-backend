@@ -1,5 +1,5 @@
 // controllers/user/getMyPosts.js
-const Post = require("../../models/Post");
+const Post = require("../../../../models/Post");
 
 const getMyPosts = async (req, res) => {
   try {
