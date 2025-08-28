@@ -17,6 +17,7 @@ const {
 // ------- PROFILE ROUTES -------
 router.get("/me", auth, getMyProfile);
 router.put("/update", auth, updateMyProfile);
+router.get("/myposts", auth, getMyPosts);
 router.get("/:id", auth, getPublicProfile);
 
 router.get("/myposts", auth, getMyPosts);
