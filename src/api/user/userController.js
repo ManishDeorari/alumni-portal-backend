@@ -14,4 +14,6 @@ module.exports = {
   getAwardEligibleUsers: require("./award/getAwardEligibleUsers"),
 
   getMyPosts: require("./profile/getMyPosts"),
+
+  getMyActivity: require("./profile/getMyActivity"),
 };

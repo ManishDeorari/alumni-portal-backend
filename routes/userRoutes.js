@@ -12,6 +12,7 @@ const {
   addPoints,
   getAwardEligibleUsers,
   getMyPosts,
+  getMyActivity,
 } = require("../src/api/user/userController");
 
 // ------- PROFILE ROUTES -------
@@ -19,8 +20,9 @@ router.get("/me", auth, getMyProfile);
 router.put("/update", auth, updateMyProfile);
 router.get("/myposts", auth, getMyPosts);
 router.get("/:id", auth, getPublicProfile);
-
+router.get("/activity", auth, getMyActivity);
 router.get("/myposts", auth, getMyPosts);
+
 
 // ------- CONNECTION ROUTES -------
 router.get("/all", auth, getAllUsers);
