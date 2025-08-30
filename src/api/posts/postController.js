@@ -1,7 +1,9 @@
+const getMyPosts = require("./post/getMyPosts");
 
 module.exports = {
   createPost: require("./post/createPost"),
   getPosts: require("./post/getPosts"),
+  getMyPosts: require("./post/getMyPosts"),
   commentPost: require("./comment/commentPost"),
   replyToComment: require("./comment/replyToComment"),
   deleteComment: require("./comment/deleteComment"),

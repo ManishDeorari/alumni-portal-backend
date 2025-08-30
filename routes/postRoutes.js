@@ -4,6 +4,7 @@ const auth = require("../middleware/authMiddleware");
 
 const {
   getPosts,
+  getMyPosts,
   createPost,
   reactToPost,
   commentPost,
@@ -22,6 +23,7 @@ const Post = require("../models/Post"); // Required for GET /posts/:id
 
 // ---------------- GET ALL POSTS ----------------
 router.get("/", getPosts);
+router.get("/posts/me", authMiddleware, getMyPosts);
 
 // ---------------- CREATE POST ----------------
 router.post("/", auth, createPost);
