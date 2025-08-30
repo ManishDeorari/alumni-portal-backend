@@ -1,5 +1,5 @@
 // controllers/profile/getMyActivity.js
-const Post = require("../../models/Post");
+const Post = require("../../../../models/Post");
 
 const getMyActivity = async (req, res) => {
   try {
