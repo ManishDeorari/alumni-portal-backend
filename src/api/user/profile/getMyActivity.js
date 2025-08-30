@@ -78,7 +78,13 @@ const getMyActivity = async (req, res) => {
     // 🔹 Sort newest first
     activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    res.json(activities);
+    res.json(
+    activities.map(a => ({
+        ...a,
+        post: a.post?.toJSON ? a.post.toJSON() : a.post
+    }))
+    );
+
   } catch (err) {
     console.error("❌ Error fetching activity:", err.message);
     res.status(500).json({ message: "Failed to fetch activity" });
