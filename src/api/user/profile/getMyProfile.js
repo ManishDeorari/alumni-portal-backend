@@ -11,13 +11,14 @@ module.exports = async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      role: user.role,        // <-- add this
+      isAdmin: user.isAdmin,  // <-- add this
       enrollmentNumber: user.enrollmentNumber,
       profilePicture: user.profilePicture,
       bannerImage: user.bannerImage,
       whatsapp: user.whatsapp,
       linkedin: user.linkedin,
       connections: user.connections,
-      // Add more fields if needed
     });
   } catch (error) {
     console.error("❌ Error fetching user profile:", error.message);
