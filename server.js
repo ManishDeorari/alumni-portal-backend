@@ -14,6 +14,10 @@ const connectRequestRoute = require("./routes/connect/request");
 const connectAcceptRoute = require("./routes/connect/accept");
 const connectRejectRoute = require("./routes/connect/reject");
 const connectListRoute = require("./routes/connect/list");
+const createMainAdmin = require("./config/createMainAdmin");
+
+// ✅ NEW: Admin Dashboard routes
+const adminRoutes = require("./routes/admin");
 
 const app = express();
 const server = http.createServer(app);
@@ -50,7 +54,9 @@ const io = new Server(server, {
 
 // ✅ Connect to MongoDB
 console.log("📡 Attempting MongoDB connection...");
-connectDB();
+connectDB().then(async () => {
+  await createMainAdmin(); // ensure main admin exists
+});
 
 // ✅ Inject `io` into every request
 app.use((req, res, next) => {
@@ -85,7 +91,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/connect/pending", pendingRoute);
-app.use("/api/admin", adminPointsRoutes);
+app.use("/api/admin-points", adminPointsRoutes);
+app.use("/api/admin", adminRoutes); // ✅ NEW ADMIN ROUTES
 app.use("/api/connect/request", connectRequestRoute);
 app.use("/api/connect/accept", connectAcceptRoute);
 app.use("/api/connect/reject", connectRejectRoute);

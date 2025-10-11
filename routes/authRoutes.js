@@ -2,75 +2,102 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+
 const router = express.Router();
 
-// ✅ SIGNUP
+// ======================== SIGNUP ==========================
 router.post("/signup", async (req, res) => {
   try {
-    const { name, email, password, enrollmentNumber } = req.body;
+    const { name, email, password, enrollmentNumber, employeeId, role } = req.body;
 
-    if (!name || !email || !password || !enrollmentNumber) {
-      return res.status(400).json({ message: "All fields required" });
+    // Validation
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ message: "All required fields must be provided" });
     }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(409).json({ message: "User already exists" });
+    if (!["alumni", "faculty"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role — must be 'alumni' or 'faculty'" });
+    }
 
+    // Check for unique email
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
+      return res.status(409).json({ message: "User already exists with this email" });
+
+    // Alumni must have enrollment number
+    if (role === "alumni" && !enrollmentNumber) {
+      return res.status(400).json({ message: "Enrollment number is required for alumni" });
+    }
+
+    // Faculty must have employee ID
+    if (role === "faculty" && !employeeId) {
+      return res.status(400).json({ message: "Employee ID is required for faculty" });
+    }
+
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create new user
     const newUser = new User({
       name,
       email,
       password: hashedPassword,
-      enrollmentNumber,
+      role,
+      enrollmentNumber: role === "alumni" ? enrollmentNumber : undefined,
+      employeeId: role === "faculty" ? employeeId : undefined,
+      isAdmin: false,
+      approved: false,
     });
 
     await newUser.save();
-    res.status(201).json({ message: "Signup successful" });
+
+    return res.status(201).json({
+      message: "Signup successful! Please wait for admin approval.",
+    });
   } catch (err) {
     console.error("❌ Signup error:", err.message);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error during signup" });
   }
 });
 
-// Login User
+// ======================== LOGIN ==========================
 router.post("/login", async (req, res) => {
   try {
-    const { email, password, enrollmentNumber } = req.body;
-    console.log("🔐 Login attempt:", { email, password, enrollmentNumber });
+    const { email, password } = req.body;
+    console.log("🔐 Login attempt:", { email });
 
     const user = await User.findOne({ email });
-    if (!user) {
-      console.log("❌ No user found");
-      return res.status(400).json({ message: "Invalid credentials" });
+    if (!user) return res.status(400).json({ message: "Invalid email or password" });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: "Invalid email or password" });
+
+    if (!user.approved && user.role !== "admin") {
+      return res.status(403).json({ message: "Your account has not been approved by admin yet." });
     }
 
-    const isPasswordMatch = await bcrypt.compare(password, user.password);
-    if (!isPasswordMatch) {
-      console.log("❌ Password mismatch");
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    if (user.enrollmentNumber !== enrollmentNumber) {
-      console.log("❌ Enrollment number mismatch");
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "your_jwt_secret", {
-      expiresIn: "1h",
-    });
+    const token = jwt.sign(
+      { id: user._id, role: user.role, isAdmin: user.isAdmin },
+      process.env.JWT_SECRET || "your_jwt_secret",
+      { expiresIn: "7d" }
+    );
 
     res.json({
+      message: "Login successful",
       token,
-      userId: user._id,
-      email: user.email,
-      name: user.name,
-      enrollmentNumber: user.enrollmentNumber,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isAdmin: user.isAdmin,
+        approved: user.approved,
+      },
     });
   } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ message: "Something went wrong" });
+    console.error("❌ Login error:", error);
+    res.status(500).json({ message: "Something went wrong during login" });
   }
 });
-
 
 module.exports = router;
