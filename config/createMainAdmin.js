@@ -24,6 +24,7 @@ async function createMainAdmin() {
       isAdmin: true,         // gives access to admin routes
       approved: true,        // auto-approved
       employeeId: "EMP001",  // unique ID for main admin (like faculty)
+      isMainAdmin: true, // ✅ mark as protected
     });
 
     await mainAdmin.save();

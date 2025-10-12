@@ -73,7 +73,7 @@ router.put("/remove-admin/:id", authenticate, verifyAdmin, async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     // Prevent removing main admin
-    if (user.email === "admin@alumniportal.com") {
+    if (user.isMainAdmin) {
       return res.status(403).json({ message: "Cannot remove Main Admin" });
     }
 

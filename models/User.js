@@ -62,6 +62,7 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false, // must be approved by admin
     },
+    isMainAdmin: { type: Boolean, default: false },
 
     // Points (Alumni only)
     points: { type: PointsSchema, default: () => ({}) },
