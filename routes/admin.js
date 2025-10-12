@@ -72,13 +72,13 @@ router.put("/remove-admin/:id", authenticate, verifyAdmin, async (req, res) => {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Prevent removing main admin
-    if (user.isMainAdmin) {
-      return res.status(403).json({ message: "Cannot remove Main Admin" });
+    // 🛡 Prevent removing main admin
+    if (user.isMainAdmin || user.email === "manishdeorari377@gmail.com") {
+      return res.status(403).json({ message: "Cannot demote Main Admin" });
     }
 
     user.isAdmin = false;
-    user.role = "faculty"; // demote to faculty
+    user.role = "faculty";
     await user.save();
 
     res.json({ message: `${user.name} is no longer an Admin.` });
@@ -121,9 +121,10 @@ router.get("/leaderboard", authenticate, verifyAdmin, async (req, res) => {
 // ✅ 7️⃣ Get all admins + faculty (for Manage Admins tab)
 router.get("/admins", authenticate, verifyAdmin, async (req, res) => {
   try {
-    const users = await User.find({ role: { $in: ["faculty", "admin"] } }).select(
-      "name email role isAdmin"
-    );
+    const users = await User.find({
+      role: { $in: ["faculty", "admin"] },
+      isMainAdmin: { $ne: true }, // ✅ exclude main admin
+    }).select("name email role isAdmin");
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch admins" });

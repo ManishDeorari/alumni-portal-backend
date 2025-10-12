@@ -4,27 +4,35 @@ const User = require("../models/User");
 
 async function createMainAdmin() {
   try {
-    const adminEmail = "manishdeorari377@gmail.com"; // You can change this
+    const adminEmail = "manishdeorari377@gmail.com";
     const existingAdmin = await User.findOne({ email: adminEmail });
 
     if (existingAdmin) {
-      console.log("✅ Main Admin already exists.");
+      // ✅ Always enforce main admin privileges
+      if (!existingAdmin.isMainAdmin) {
+        existingAdmin.isMainAdmin = true;
+        existingAdmin.isAdmin = true;
+        existingAdmin.role = "admin";
+        existingAdmin.approved = true;
+        await existingAdmin.save();
+        console.log("♻️ Existing user upgraded to Main Admin");
+      } else {
+        console.log("✅ Main Admin already exists and verified");
+      }
       return;
     }
 
-    // Hash password for security
     const hashedPassword = await bcrypt.hash("ManPri@2322", 10);
 
-    // Create Main Admin user
     const mainAdmin = new User({
       name: "Main Admin",
       email: adminEmail,
       password: hashedPassword,
-      role: "admin",         // special role
-      isAdmin: true,         // gives access to admin routes
-      approved: true,        // auto-approved
-      employeeId: "EMP001",  // unique ID for main admin (like faculty)
-      isMainAdmin: true, // ✅ mark as protected
+      role: "admin",
+      isAdmin: true,
+      isMainAdmin: true, // ✅ KEY FLAG
+      approved: true,
+      employeeId: "EMP001",
     });
 
     await mainAdmin.save();
