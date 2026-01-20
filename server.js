@@ -15,6 +15,8 @@ const connectAcceptRoute = require("./routes/connect/accept");
 const connectRejectRoute = require("./routes/connect/reject");
 const connectListRoute = require("./routes/connect/list");
 const createMainAdmin = require("./config/createMainAdmin");
+const yearRolloverRoute = require("./routes/admin/yearRollover");
+
 
 // ✅ NEW: Admin Dashboard routes
 const adminRoutes = require("./routes/admin");
@@ -64,6 +66,7 @@ app.use((req, res, next) => {
   next();
 });
 
+
 // ✅ Handle socket events
 io.on("connection", (socket) => {
   console.log("📡 New socket connection:", socket.id);
@@ -97,6 +100,7 @@ app.use("/api/connect/request", connectRequestRoute);
 app.use("/api/connect/accept", connectAcceptRoute);
 app.use("/api/connect/reject", connectRejectRoute);
 app.use("/api/connect/list", connectListRoute);
+app.use("/api/admin", yearRolloverRoute);
 
 // ✅ Global Error Handler
 app.use((err, req, res, next) => {

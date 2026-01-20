@@ -12,6 +12,12 @@ const PointsSchema = new mongoose.Schema({
   total: { type: Number, default: 0 },
 });
 
+// ===================== Last Year Points Schema =====================
+const LastYearPointsSchema = new mongoose.Schema({
+  year: { type: String }, // e.g. "2025"
+  total: { type: Number, default: 0 },
+});
+
 // ===================== Notification Schema =====================
 const NotificationSchema = new mongoose.Schema({
   type: { type: String },
@@ -66,6 +72,9 @@ const UserSchema = new mongoose.Schema(
 
     // Points (Alumni only)
     points: { type: PointsSchema, default: () => ({}) },
+
+    // Last Year Points (Alumni only)
+    lastYearPoints: { type: LastYearPointsSchema, default: null },
 
     // Notifications
     notifications: [NotificationSchema],

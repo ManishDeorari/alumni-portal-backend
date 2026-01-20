@@ -131,4 +131,22 @@ router.get("/admins", authenticate, verifyAdmin, async (req, res) => {
   }
 });
 
+// 🏆 Last Year Leaderboard (Alumni only)
+router.get("/leaderboard/last-year", authenticate, verifyAdmin, async (req, res) => {
+  try {
+    const users = await User.find({
+      role: "alumni",
+      lastYearPoints: { $ne: null },
+    })
+      .sort({ "lastYearPoints.total": -1 })
+      .limit(50)
+      .select("name email profilePicture lastYearPoints");
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch last year leaderboard" });
+  }
+});
+
 module.exports = router;
+
