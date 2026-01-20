@@ -1,120 +1,152 @@
-"use client";
+const express = require("express");
+const router = express.Router();
+const User = require("../models/User");
+const authenticate = require("../middleware/authMiddleware");
 
-import React, { useEffect, useState } from "react";
-import Image from "next/image";
-import { motion } from "framer-motion";
-import { toast } from "react-hot-toast";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "https://alumni-backend-d9k9.onrender.com";
-
-export default function Leaderboard() {
-  const [currentYear, setCurrentYear] = useState([]);
-  const [lastYear, setLastYear] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-
-  const token = localStorage.getItem("token");
-
-  // Fetch current & last year leaderboard
-  const fetchLeaderboards = async () => {
-    setLoading(true);
-    try {
-      const [resCurrent, resLast] = await Promise.all([
-        fetch(`${API}/api/admin/leaderboard`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API}/api/admin/leaderboard/last-year`, { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
-
-      if (!resCurrent.ok) throw new Error("Failed to fetch current year leaderboard");
-      if (!resLast.ok) throw new Error("Failed to fetch last year leaderboard");
-
-      const currentData = await resCurrent.json();
-      const lastData = await resLast.json();
-
-      setCurrentYear(currentData);
-      setLastYear(lastData);
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || "Could not load leaderboard");
-    } finally {
-      setLoading(false);
+// ✅ Middleware to check admin access
+const verifyAdmin = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ message: "Access denied. Admins only." });
     }
-  };
+    next();
+  } catch (err) {
+    res.status(500).json({ message: "Server error verifying admin." });
+  }
+};
 
-  useEffect(() => {
-    fetchLeaderboards();
-  }, []);
+// ✅ 1️⃣ Get all pending users (faculty/alumni waiting for approval)
+router.get("/pending-users", authenticate, verifyAdmin, async (req, res) => {
+  try {
+    const pendingUsers = await User.find({
+      approved: false,
+      role: { $in: ["faculty", "alumni"] },
+    }).select("-password");
+    res.json(pendingUsers);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch pending users" });
+  }
+});
 
-  const filterUsers = (users) =>
-    users.filter((u) =>
-      `${u.name} ${u.enrollmentNumber || ""}`.toLowerCase().includes(search.toLowerCase())
-    );
+// ✅ 2️⃣ Approve a specific user
+router.put("/approve/:id", authenticate, verifyAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
 
-  const currentFiltered = filterUsers(currentYear);
-  const lastFiltered = filterUsers(lastYear);
+    user.approved = true;
+    await user.save();
 
-  // ----------------- CARD -----------------
-  const Card = ({ title, users }) => (
-    <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">{title}</h2>
-      {users.length === 0 ? (
-        <p className="text-gray-500 text-center">No eligible users.</p>
-      ) : (
-        <ul className="space-y-4">
-          {users.map((user, index) => (
-            <li
-              key={user._id}
-              className="flex items-center justify-between bg-gray-100 rounded-xl p-4 shadow-sm"
-            >
-              <div className="flex items-center space-x-4">
-                <span className="text-lg font-bold text-gray-700 w-6">{index + 1}.</span>
-                <Image
-                  src={user.profilePicture || "/default-profile.png"}
-                  alt={user.name}
-                  width={40}
-                  height={40}
-                  className="w-10 h-10 rounded-full object-cover border border-gray-300"
-                />
-                <div>
-                  <p className="font-semibold text-lg text-gray-800">{user.name}</p>
-                  <p className="text-sm text-gray-500">{user.enrollmentNumber || "N/A"}</p>
-                </div>
-              </div>
-              <span className="font-bold text-blue-600 text-lg">
-                {user.points?.total ?? user.lastYearPoints?.total ?? 0} pts
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+    res.json({ message: `${user.name} has been approved successfully!` });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to approve user" });
+  }
+});
 
-  return (
-    <motion.div
-      key="leaderboard"
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="p-6"
-    >
-      <div className="flex justify-between items-center mb-6 max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold text-blue-700">🏆 Alumni Leaderboard</h1>
-        <input
-          type="text"
-          placeholder="Search by name or enrollment…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="px-3 py-2 border rounded-md w-1/3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
+// ✅ 3️⃣ Promote a faculty to Admin
+router.put("/make-admin/:id", authenticate, verifyAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-      {loading ? (
-        <p className="text-center text-gray-500">Loading leaderboard...</p>
-      ) : (
-        <>
-          <Card title="🎓 Current Year" users={currentFiltered} />
-          <Card title="🥇 Last Year" users={lastFiltered} />
-        </>
-      )}
-    </motion.div>
-  );
-}
+    if (user.role !== "faculty") {
+      return res.status(400).json({ message: "Only faculty can be promoted to admin" });
+    }
+
+    user.isAdmin = true;
+    user.role = "admin";
+    user.approved = true; // auto approve on promotion
+    await user.save();
+
+    res.json({ message: `${user.name} is now an Admin!` });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to promote user" });
+  }
+});
+
+// ✅ 4️⃣ Demote an Admin back to Faculty
+router.put("/remove-admin/:id", authenticate, verifyAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // 🛡 Prevent removing main admin
+    if (user.isMainAdmin || user.email === "manishdeorari377@gmail.com") {
+      return res.status(403).json({ message: "Cannot demote Main Admin" });
+    }
+
+    user.isAdmin = false;
+    user.role = "faculty";
+    await user.save();
+
+    res.json({ message: `${user.name} is no longer an Admin.` });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to demote user" });
+  }
+});
+
+// ✅ 5️⃣ Reject/Delete a user (faculty or alumni)
+router.delete("/delete-user/:id", authenticate, verifyAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Prevent deleting main admin
+    if (user.email === "admin@alumniportal.com") {
+      return res.status(403).json({ message: "Cannot delete Main Admin" });
+    }
+
+    await user.remove();
+    res.json({ message: `${user.name} has been deleted successfully.` });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete user" });
+  }
+});
+
+// ✅ 6️⃣ Leaderboard — view top alumni by points
+router.get("/leaderboard", authenticate, verifyAdmin, async (req, res) => {
+  try {
+    const topUsers = await User.find({ approved: true, role: "alumni" })
+      .sort({ "points.total": -1 })
+      .limit(50)
+      .select("name email role points profilePicture");
+    res.json(topUsers);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch leaderboard" });
+  }
+});
+
+// ✅ 7️⃣ Get all admins + faculty (for Manage Admins tab)
+router.get("/admins", authenticate, verifyAdmin, async (req, res) => {
+  try {
+    const users = await User.find({
+      role: { $in: ["faculty", "admin"] },
+      isMainAdmin: { $ne: true }, // ✅ exclude main admin
+    }).select("name email role isAdmin");
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch admins" });
+  }
+});
+
+// 🏆 Last Year Leaderboard (Alumni only)
+router.get("/leaderboard/last-year", authenticate, verifyAdmin, async (req, res) => {
+  try {
+    const users = await User.find({
+      role: "alumni",
+      lastYearPoints: { $ne: null },
+    })
+      .sort({ "lastYearPoints.total": -1 })
+      .limit(50)
+      .select("name email profilePicture lastYearPoints");
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch last year leaderboard" });
+  }
+});
+
+module.exports = router;
+
