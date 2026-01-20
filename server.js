@@ -16,7 +16,7 @@ const connectRejectRoute = require("./routes/connect/reject");
 const connectListRoute = require("./routes/connect/list");
 const createMainAdmin = require("./config/createMainAdmin");
 const yearRolloverRoute = require("./routes/admin/yearRollover");
-
+const rolloverConfigRoute = require("./routes/admin/rolloverConfig");
 
 // ✅ NEW: Admin Dashboard routes
 const adminRoutes = require("./routes/admin");
@@ -101,6 +101,7 @@ app.use("/api/connect/accept", connectAcceptRoute);
 app.use("/api/connect/reject", connectRejectRoute);
 app.use("/api/connect/list", connectListRoute);
 app.use("/api/admin", yearRolloverRoute);
+app.use("/api/admin", rolloverConfigRoute);
 
 // ✅ Global Error Handler
 app.use((err, req, res, next) => {
