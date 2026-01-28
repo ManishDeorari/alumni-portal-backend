@@ -44,10 +44,13 @@ const EducationSchema = new mongoose.Schema({
   degree: String,
   fieldOfStudy: String,
   institution: String,
+  campus: String,
   location: String,
   startDate: String,
   endDate: String,
-  description: String,
+  grade: String,
+  activities: { type: String, maxlength: 500 },
+  description: { type: String, maxlength: 1000 },
 });
 
 const WorkProfileSchema = new mongoose.Schema({
