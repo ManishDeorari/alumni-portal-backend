@@ -39,11 +39,23 @@ const reactToComment = async (req, res) => {
     post.markModified("comments");
     await post.save();
 
+    console.log("💾 Post saved successfully");
+
     // 🔔 Send notification to comment owner BEFORE fetching updated post
     // Get the comment owner ID (could be populated object or ObjectId)
     const commentOwnerId = comment.user?._id ? comment.user._id.toString() : comment.user.toString();
 
+    console.log("🔍 Comment Reaction Debug:", {
+      userAlreadyReacted,
+      commentOwnerId,
+      currentUserId: userId,
+      shouldSendNotification: !userAlreadyReacted && commentOwnerId !== userId,
+      commentUser: comment.user,
+      emoji
+    });
+
     if (!userAlreadyReacted && commentOwnerId !== userId) {
+      console.log("📝 Creating notification...");
       const Notification = require("../../../../models/Notification");
       const newNotification = new Notification({
         sender: userId,
@@ -55,10 +67,17 @@ const reactToComment = async (req, res) => {
       });
       await newNotification.save();
 
+      console.log("✅ Notification saved:", newNotification._id);
+
       if (req.io) {
         req.io.to(commentOwnerId).emit("newNotification", newNotification);
+        console.log("📡 WebSocket emitted to room:", commentOwnerId);
+      } else {
+        console.log("❌ req.io is not available!");
       }
     }
+
+    console.log("🔄 Fetching updated post...");
 
     // ✅ Fetch fully updated post with comment + reply users
     const updatedPost = await Post.findById(postId)
@@ -99,6 +118,8 @@ const reactToComment = async (req, res) => {
     res.status(200).json({ comment: updatedComment });
   } catch (err) {
     console.error("🔥 Comment reaction error:", err.message);
+    console.error("Full error:", err);
+    console.error("Stack:", err.stack);
     res.status(500).json({ error: err.message });
   }
 };

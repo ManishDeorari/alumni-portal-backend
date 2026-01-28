@@ -94,21 +94,9 @@ app.use(express.urlencoded({ extended: true, limit: "50mb", parameterLimit: 5000
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-// ✅ Health Check Route (Must be before other routes for Render)
+// ✅ Health Check Route
 app.get("/", (req, res) => {
-  res.status(200).json({
-    status: "ok",
-    message: "Alumni Portal API is running",
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "healthy",
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
-  });
+  res.send("✅ API is running...");
 });
 
 // ✅ Routes
@@ -138,9 +126,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Server Error" });
 });
 
-// ✅ Start Server - Bind to 0.0.0.0 for Render
-const HOST = process.env.HOST || "0.0.0.0";
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on ${HOST}:${PORT}`);
-  console.log(`✅ Health check available at http://${HOST}:${PORT}/health`);
+// ✅ Start Server
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
