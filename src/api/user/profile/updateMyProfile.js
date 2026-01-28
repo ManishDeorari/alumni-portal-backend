@@ -22,11 +22,13 @@ module.exports = async (req, res) => {
       }
     }
 
-    // ✅ Update user profile picture in DB
+    // ✅ Update user profile picture in DB only if provided
     const updates = {
       ...rest,
-      profilePicture: profileImage,
     };
+    if (profileImage) {
+      updates.profilePicture = profileImage;
+    }
 
     const updatedUser = await User.findByIdAndUpdate(req.user.id, updates, {
       new: true,
