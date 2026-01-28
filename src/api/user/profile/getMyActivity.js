@@ -79,10 +79,13 @@ const getMyActivity = async (req, res) => {
     activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     res.json(
-    activities.map(a => ({
-        ...a,
-        post: a.post?.toJSON ? a.post.toJSON() : a.post
-    }))
+      activities.map((a) => {
+        const postData = a.post?.toJSON ? a.post.toJSON() : a.post;
+        return {
+          ...a,
+          post: postData,
+        };
+      })
     );
 
   } catch (err) {

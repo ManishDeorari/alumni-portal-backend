@@ -66,6 +66,7 @@ const JobPreferencesSchema = new mongoose.Schema({
   noticePeriod: String,
   salary: String,
   resumeLink: String,
+  portfolioLink: String,
 });
 
 // ===================== Main User Schema =====================
