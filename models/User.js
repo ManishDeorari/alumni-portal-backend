@@ -131,6 +131,10 @@ const UserSchema = new mongoose.Schema(
     // Last Year Points (Alumni only)
     lastYearPoints: { type: LastYearPointsSchema, default: null },
 
+    // Tracking for points (Alumni only)
+    postPointLogs: [{ type: Date }], // Dates when post points were awarded
+    profileCompletionAwarded: { type: Boolean, default: false },
+
     // Notifications
     notifications: [NotificationSchema],
 

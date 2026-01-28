@@ -22,6 +22,7 @@ const userConnectionsRoute = require("./routes/connect/userConnections");
 const createMainAdmin = require("./config/createMainAdmin");
 const yearRolloverRoute = require("./routes/admin/yearRollover");
 const rolloverConfigRoute = require("./routes/admin/rolloverConfig");
+const pointsSystemRoutes = require("./routes/admin/pointsSystemRoutes");
 
 // ✅ NEW: Admin Dashboard routes
 const adminRoutes = require("./routes/admin");
@@ -118,6 +119,7 @@ app.use("/api/connect/sent", connectSentRoute);
 app.use("/api/connect/user", userConnectionsRoute);
 app.use("/api/admin", yearRolloverRoute);
 app.use("/api/admin", rolloverConfigRoute);
+app.use("/api/admin-points-mgmt", pointsSystemRoutes);
 app.use("/api/notifications", notificationRoutes);
 
 // ✅ Global Error Handler

@@ -1,4 +1,5 @@
 const User = require("../../../../models/User");
+const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
 const cloudinary = require("../../../../config/cloudinary");
 
 module.exports = async (req, res) => {
@@ -33,6 +34,27 @@ module.exports = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(req.user.id, updates, {
       new: true,
     }).select("-password");
+
+    // ✅ Award Points Logic (if profile is "completed")
+    // For simplicity, we award points on the first detailed update if not already awarded
+    if (updatedUser.role === "alumni" && !updatedUser.profileCompletionAwarded) {
+      const config = await PointsSystemConfig.findOne() || { profileCompletionPoints: 50 };
+
+      // Simple check: if they filled some bio or address or education
+      const isDetailed = updatedUser.bio || updatedUser.address || (updatedUser.education && updatedUser.education.length > 0);
+
+      if (isDetailed) {
+        if (!updatedUser.points) updatedUser.points = { total: 0 };
+        updatedUser.points.total = (updatedUser.points.total || 0) + (config.profileCompletionPoints || 50);
+
+        if (updatedUser.points.profileCompletion === undefined) updatedUser.points.profileCompletion = 0;
+        updatedUser.points.profileCompletion += (config.profileCompletionPoints || 50);
+
+        updatedUser.profileCompletionAwarded = true;
+        await updatedUser.save();
+        console.log(`✅ Awarded ${config.profileCompletionPoints} points to user ${updatedUser.name} for profile completion.`);
+      }
+    }
 
     res.json(updatedUser);
   } catch (error) {

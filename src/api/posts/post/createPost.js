@@ -1,4 +1,6 @@
 const Post = require("../../../../models/Post");
+const User = require("../../../../models/User");
+const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
 
 const createPost = async (req, res) => {
   try {
@@ -39,6 +41,41 @@ const createPost = async (req, res) => {
     await post.save();
     const populated = await post.populate("user", "name profilePicture");
     req.io?.emit("postCreated", populated);
+
+    // ✅ Award Points Logic
+    if (userRole === "alumni") {
+      try {
+        const user = await User.findById(req.user._id || req.user.id);
+        const config = (await PointsSystemConfig.findOne()) || { postPoints: 10, postLimitCount: 3, postLimitDays: 7 };
+
+        const now = new Date();
+        const limitMs = (config.postLimitDays || 7) * 24 * 60 * 60 * 1000;
+
+        // Filter logs to find those within the limit window
+        const recentLogs = (user.postPointLogs || []).filter(date => (now - new Date(date)) < limitMs);
+
+        if (recentLogs.length < (config.postLimitCount || 3)) {
+          // Award points
+          if (!user.points) user.points = { total: 0 };
+          user.points.total = (user.points.total || 0) + (config.postPoints || 10);
+
+          // Add to category if needed (e.g., contentContribution)
+          if (user.points.contentContribution === undefined) user.points.contentContribution = 0;
+          user.points.contentContribution += (config.postPoints || 10);
+
+          // Update logs
+          if (!user.postPointLogs) user.postPointLogs = [];
+          user.postPointLogs.push(now);
+
+          await user.save();
+          console.log(`✅ Awarded ${config.postPoints} points to user ${user.name} for posting.`);
+        } else {
+          console.log(`ℹ️ Post limit reached for user ${user.name}, no points awarded.`);
+        }
+      } catch (awardErr) {
+        console.error("❌ Failed to award points:", awardErr.message);
+      }
+    }
 
     res.status(201).json({ post: populated });
 

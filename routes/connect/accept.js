@@ -3,6 +3,7 @@ const router = express.Router();
 const authenticate = require("../../middleware/authMiddleware");
 const Connect = require("../../models/Connect");
 const User = require("../../models/User");
+const PointsSystemConfig = require("../../models/PointsSystemConfig");
 
 router.post("/", authenticate, async (req, res) => {
   try {
@@ -58,6 +59,25 @@ router.post("/", authenticate, async (req, res) => {
 
     await receiver.save();
     await sender.save();
+
+    // ✅ Award Points Logic
+    const config = await PointsSystemConfig.findOne() || { connectionPoints: 10 };
+    const pointsToAdd = config.connectionPoints || 10;
+
+    const awardPoints = async (user) => {
+      if (user.role === "alumni") {
+        if (!user.points) user.points = { total: 0 };
+        user.points.total = (user.points.total || 0) + pointsToAdd;
+
+        if (user.points.studentEngagement === undefined) user.points.studentEngagement = 0;
+        user.points.studentEngagement += pointsToAdd;
+
+        await user.save();
+      }
+    };
+
+    await awardPoints(receiver);
+    await awardPoints(sender);
 
     res.status(200).json({ message: "Connection request accepted" });
   } catch (err) {
