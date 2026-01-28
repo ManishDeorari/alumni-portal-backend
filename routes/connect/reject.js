@@ -18,8 +18,8 @@ router.post("/", authenticate, async (req, res) => {
     }
 
     // Remove from User arrays
-    receiver.pendingRequests = receiver.pendingRequests.filter(id => id.toString() !== from.toString());
-    sender.sentRequests = sender.sentRequests.filter(id => id.toString() !== to.toString());
+    receiver.pendingRequests = (receiver.pendingRequests || []).filter(id => id.toString() !== from);
+    sender.sentRequests = (sender.sentRequests || []).filter(id => id.toString() !== to.toString());
 
     // Also remove from Connect model
     await Connect.findOneAndDelete({ from, to, status: "pending" });

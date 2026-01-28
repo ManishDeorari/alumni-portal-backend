@@ -7,7 +7,7 @@ const User = require("../../models/User");
 const Connect = require("../../models/Connect");
 
 router.post("/", authMiddleware, async (req, res) => {
-  const from = req.user.id;
+  const from = req.user._id;
   const { toUserId: to } = req.body;
 
   try {
@@ -17,8 +17,8 @@ router.post("/", authMiddleware, async (req, res) => {
     if (!receiver || !sender) return res.status(404).json({ message: "User not found" });
 
     // Remove from User arrays
-    sender.sentRequests = sender.sentRequests.filter(id => id.toString() !== to.toString());
-    receiver.pendingRequests = receiver.pendingRequests.filter(id => id.toString() !== from.toString());
+    sender.sentRequests = (sender.sentRequests || []).filter(id => id.toString() !== to.toString());
+    receiver.pendingRequests = (receiver.pendingRequests || []).filter(id => id.toString() !== from.toString());
 
     // Also remove from Connect model
     await Connect.findOneAndDelete({ from, to, status: "pending" });

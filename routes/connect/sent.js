@@ -7,11 +7,12 @@ const User = require("../../models/User");
 
 router.get("/", auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).populate("sentRequests", "name profilePicture course year enrollmentNumber workProfile");
-    res.status(200).json(user.sentRequests);
+    const user = await User.findById(req.user._id).populate("sentRequests", "name profilePicture course year enrollmentNumber workProfile");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.status(200).json(user.sentRequests || []);
   } catch (err) {
     console.error("Error in GET /connect/sent:", err.stack);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Internal server error", error: err.message });
   }
 });
 

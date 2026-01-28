@@ -21,13 +21,17 @@ router.post("/", authenticate, async (req, res) => {
     }
 
     // Check if already connected or requested
-    if (sender.connections.includes(to)) {
+    const connStr = (sender.connections || []).map(id => id.toString());
+    const sentStr = (sender.sentRequests || []).map(id => id.toString());
+    const pendStr = (sender.pendingRequests || []).map(id => id.toString());
+
+    if (connStr.includes(to)) {
       return res.status(400).json({ message: "Already connected" });
     }
-    if (sender.sentRequests.includes(to)) {
+    if (sentStr.includes(to)) {
       return res.status(400).json({ message: "Connection request already sent" });
     }
-    if (sender.pendingRequests.includes(to)) {
+    if (pendStr.includes(to)) {
       return res.status(400).json({ message: "They already sent you a request. Accept it instead." });
     }
 

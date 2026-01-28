@@ -6,15 +6,15 @@ const User = require("../../models/User");
 
 router.get("/", authMiddleware, async (req, res) => {
   try {
-    const currentUser = await User.findById(req.user.id);
+    const currentUser = await User.findById(req.user._id);
     if (!currentUser) return res.status(404).json({ message: "User not found" });
 
     // Exclude self, already connected, and already requested
     const excludeIds = [
-      req.user.id,
-      ...currentUser.connections,
-      ...currentUser.sentRequests,
-      ...currentUser.pendingRequests
+      req.user._id.toString(),
+      ...(currentUser.connections || []).map(id => id.toString()),
+      ...(currentUser.sentRequests || []).map(id => id.toString()),
+      ...(currentUser.pendingRequests || []).map(id => id.toString())
     ];
 
     // Basic suggestion logic: find users with same course, industry, or skills

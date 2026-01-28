@@ -25,17 +25,21 @@ router.post("/", authenticate, async (req, res) => {
 
     if (!connection) {
       // Logic fallback: check if it's already in pendingRequests array even if Connect doc missing
-      if (!receiver.pendingRequests.includes(from)) {
+      const pendStr = (receiver.pendingRequests || []).map(id => id.toString());
+      if (!pendStr.includes(from)) {
         return res.status(404).json({ message: "No pending request found" });
       }
     }
 
     // Update User arrays
-    receiver.pendingRequests = receiver.pendingRequests.filter(id => id.toString() !== from.toString());
-    sender.sentRequests = sender.sentRequests.filter(id => id.toString() !== to.toString());
+    receiver.pendingRequests = (receiver.pendingRequests || []).filter(id => id.toString() !== from);
+    sender.sentRequests = (sender.sentRequests || []).filter(id => id.toString() !== to.toString());
 
-    if (!receiver.connections.includes(from)) receiver.connections.push(from);
-    if (!sender.connections.includes(to)) sender.connections.push(to);
+    const myConnStr = (receiver.connections || []).map(id => id.toString());
+    const senderConnStr = (sender.connections || []).map(id => id.toString());
+
+    if (!myConnStr.includes(from)) receiver.connections.push(from);
+    if (!senderConnStr.includes(to.toString())) sender.connections.push(to);
 
     // Notification
     sender.notifications.push({
