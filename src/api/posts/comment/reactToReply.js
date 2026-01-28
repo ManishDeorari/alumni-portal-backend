@@ -6,7 +6,13 @@ const reactToReply = async (req, res) => {
   const userId = req.user._id.toString();
 
   try {
-    const post = await Post.findById(postId);
+    const post = await Post.findById(postId).populate({
+      path: "comments.user",
+      select: "name profilePicture"
+    }).populate({
+      path: "comments.replies.user",
+      select: "name profilePicture"
+    });
     if (!post) return res.status(404).json({ msg: "Post not found" });
 
     const comment = post.comments.id(commentId);
@@ -38,6 +44,27 @@ const reactToReply = async (req, res) => {
 
     post.markModified("comments");
     await post.save();
+
+    // 🔔 Send notification to reply owner BEFORE fetching updated post
+    // Get the reply owner ID (could be populated object or ObjectId)
+    const replyOwnerId = reply.user?._id ? reply.user._id.toString() : reply.user.toString();
+
+    if (!userAlreadyReacted && replyOwnerId !== userId) {
+      const Notification = require("../../../../models/Notification");
+      const newNotification = new Notification({
+        sender: userId,
+        receiver: replyOwnerId,
+        type: "reply_reaction",
+        message: `${req.user.name} reacted ${emoji} to your reply`,
+        postId: postId,
+        commentId: commentId,
+      });
+      await newNotification.save();
+
+      if (req.io) {
+        req.io.to(replyOwnerId).emit("newNotification", newNotification);
+      }
+    }
 
     const updatedPost = await Post.findById(postId)
       .populate("user", "name profilePicture")

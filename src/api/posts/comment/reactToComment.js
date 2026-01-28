@@ -6,7 +6,10 @@ const reactToComment = async (req, res) => {
   const userId = req.user._id.toString();
 
   try {
-    const post = await Post.findById(postId);
+    const post = await Post.findById(postId).populate({
+      path: "comments.user",
+      select: "name profilePicture"
+    });
     if (!post) return res.status(404).json({ msg: "Post not found" });
 
     const comment = post.comments.id(commentId);
@@ -35,6 +38,27 @@ const reactToComment = async (req, res) => {
 
     post.markModified("comments");
     await post.save();
+
+    // 🔔 Send notification to comment owner BEFORE fetching updated post
+    // Get the comment owner ID (could be populated object or ObjectId)
+    const commentOwnerId = comment.user?._id ? comment.user._id.toString() : comment.user.toString();
+
+    if (!userAlreadyReacted && commentOwnerId !== userId) {
+      const Notification = require("../../../../models/Notification");
+      const newNotification = new Notification({
+        sender: userId,
+        receiver: commentOwnerId,
+        type: "comment_reaction",
+        message: `${req.user.name} reacted ${emoji} to your comment`,
+        postId: postId,
+        commentId: commentId,
+      });
+      await newNotification.save();
+
+      if (req.io) {
+        req.io.to(commentOwnerId).emit("newNotification", newNotification);
+      }
+    }
 
     // ✅ Fetch fully updated post with comment + reply users
     const updatedPost = await Post.findById(postId)
