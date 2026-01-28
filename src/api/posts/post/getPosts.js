@@ -4,8 +4,11 @@ const getPosts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
+    const type = req.query.type || "Regular";
 
-    const posts = await Post.find()
+    const filter = type === "all" ? {} : { type };
+
+    const posts = await Post.find(filter)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -13,7 +16,7 @@ const getPosts = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const total = await Post.countDocuments();
+    const total = await Post.countDocuments(filter);
 
     res.json({ posts, total });
   } catch (err) {

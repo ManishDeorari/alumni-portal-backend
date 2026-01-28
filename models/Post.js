@@ -47,6 +47,11 @@ const postSchema = new mongoose.Schema({
     of: [mongoose.Schema.Types.ObjectId],
     default: () => new Map(),
   },
+  type: {
+    type: String,
+    enum: ["Regular", "Session", "Event", "Announcement"],
+    default: "Regular",
+  },
 }, { timestamps: true });
 
 postSchema.index({ user: 1, createdAt: -1 });
