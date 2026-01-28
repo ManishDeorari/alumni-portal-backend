@@ -133,6 +133,18 @@ const UserSchema = new mongoose.Schema(
 
     // Notifications
     notifications: [NotificationSchema],
+
+    // Visit Tracking
+    visitStats: {
+      totalVisits: { type: Number, default: 0 },
+      todayVisits: { type: Number, default: 0 },
+    },
+    visitors: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        lastVisit: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );

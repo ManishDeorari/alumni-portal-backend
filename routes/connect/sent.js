@@ -7,16 +7,8 @@ const User = require("../../models/User");
 
 router.get("/", auth, async (req, res) => {
   try {
-    const userId = req.user._id;
-
-    const sentConnections = await Connect.find({
-      from: userId,
-      status: "pending"
-    }).populate("to", "name profilePicture course year batch");
-
-    const sentUsers = sentConnections.map(conn => conn.to);
-
-    res.status(200).json(sentUsers);
+    const user = await User.findById(req.user.id).populate("sentRequests", "name profilePicture course year enrollmentNumber workProfile");
+    res.status(200).json(user.sentRequests);
   } catch (err) {
     console.error("Error in GET /connect/sent:", err.stack);
     res.status(500).json({ message: "Internal server error" });

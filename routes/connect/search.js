@@ -5,27 +5,46 @@ const authMiddleware = require("../../middleware/authMiddleware");
 const User = require("../../models/User");
 
 router.get("/", authMiddleware, async (req, res) => {
-  const { query } = req.query; // ?query=abc
+  const { query, course, year, industry, skills } = req.query;
 
   try {
-    const regex = new RegExp(query, "i"); // case-insensitive
     const currentUser = await User.findById(req.user.id);
-    
-    const users = await User.find({
-      _id: { $ne: req.user.id }, // exclude self
-      $or: [
+    const filter = { _id: { $ne: req.user.id } };
+
+    if (query) {
+      const regex = new RegExp(query, "i");
+      filter.$or = [
         { name: regex },
         { email: regex },
         { enrollmentNumber: regex },
         { course: regex }
-      ]
-    }).select("name email enrollmentNumber course profilePicture connections");
+      ];
+    }
 
-    // mark already connected users
-    const result = users.map((u) => ({
-      ...u._doc,
-      isConnected: currentUser.connections.includes(u._id),
-    }));
+    if (course) filter.course = course;
+    if (year) filter.year = year;
+    if (industry) filter["workProfile.industry"] = industry;
+    if (skills) {
+      const skillsArray = skills.split(",").map(s => s.trim());
+      filter.skills = { $in: skillsArray.map(s => new RegExp(s, "i")) };
+    }
+
+    const users = await User.find(filter)
+      .select("name email enrollmentNumber course year profilePicture connections pendingRequests sentRequests workProfile skills")
+      .limit(50);
+
+    // mark relationship status
+    const result = users.map((u) => {
+      let status = "none";
+      if (currentUser.connections.includes(u._id)) status = "connected";
+      else if (currentUser.sentRequests.includes(u._id)) status = "sent";
+      else if (currentUser.pendingRequests.includes(u._id)) status = "pending";
+
+      return {
+        ...u._doc,
+        connectionStatus: status,
+      };
+    });
 
     res.json(result);
   } catch (err) {

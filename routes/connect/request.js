@@ -13,33 +13,42 @@ router.post("/", authenticate, async (req, res) => {
       return res.status(400).json({ message: "You cannot connect with yourself" });
     }
 
-    // Check if request already exists (pending or accepted)
-    const existing = await Connect.findOne({
-      $or: [
-        { from, to },
-        { from: to, to: from }
-      ],
-      status: { $in: ["pending", "accepted"] },
-    });
+    const sender = await User.findById(from);
+    const receiver = await User.findById(to);
 
-    if (existing) {
-      return res.status(400).json({ message: "Request already exists or already connected" });
+    if (!receiver) {
+      return res.status(404).json({ message: "User not found" });
     }
 
+    // Check if already connected or requested
+    if (sender.connections.includes(to)) {
+      return res.status(400).json({ message: "Already connected" });
+    }
+    if (sender.sentRequests.includes(to)) {
+      return res.status(400).json({ message: "Connection request already sent" });
+    }
+    if (sender.pendingRequests.includes(to)) {
+      return res.status(400).json({ message: "They already sent you a request. Accept it instead." });
+    }
+
+    // Update sender and receiver
+    sender.sentRequests.push(to);
+    receiver.pendingRequests.push(from);
+
+    // Also keep Connect model for history/compatibility if needed, 
+    // but the primary logic now relies on User arrays.
     const connection = new Connect({ from, to });
     await connection.save();
 
     // Send notification to recipient
-    const sender = await User.findById(from);
-    await User.findByIdAndUpdate(to, {
-      $push: {
-        notifications: {
-          type: "connect",
-          message: `${sender.name} sent you a connection request`,
-          from: from
-        }
-      }
+    receiver.notifications.push({
+      type: "connect",
+      message: `${sender.name} sent you a connection request`,
+      from: from
     });
+
+    await sender.save();
+    await receiver.save();
 
     res.status(201).json({ message: "Connection request sent successfully" });
   } catch (err) {

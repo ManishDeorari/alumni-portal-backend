@@ -4,27 +4,27 @@ const router = express.Router();
 const authMiddleware = require("../../middleware/authMiddleware");
 const User = require("../../models/User");
 
-router.post("/cancel", authMiddleware, async (req, res) => {
-  const { toUserId } = req.body;
+const Connect = require("../../models/Connect");
+
+router.post("/", authMiddleware, async (req, res) => {
+  const from = req.user.id;
+  const { toUserId: to } = req.body;
 
   try {
-    const currentUser = await User.findById(req.user.id);
-    const toUser = await User.findById(toUserId);
+    const sender = await User.findById(from);
+    const receiver = await User.findById(to);
 
-    if (!toUser) return res.status(404).json({ message: "User not found" });
+    if (!receiver || !sender) return res.status(404).json({ message: "User not found" });
 
-    // Remove from currentUser.sentRequests
-    currentUser.sentRequests = currentUser.sentRequests.filter(
-      (id) => id.toString() !== toUserId
-    );
+    // Remove from User arrays
+    sender.sentRequests = sender.sentRequests.filter(id => id.toString() !== to.toString());
+    receiver.pendingRequests = receiver.pendingRequests.filter(id => id.toString() !== from.toString());
 
-    // Remove from toUser.pendingRequests
-    toUser.pendingRequests = toUser.pendingRequests.filter(
-      (id) => id.toString() !== currentUser._id.toString()
-    );
+    // Also remove from Connect model
+    await Connect.findOneAndDelete({ from, to, status: "pending" });
 
-    await currentUser.save();
-    await toUser.save();
+    await sender.save();
+    await receiver.save();
 
     res.json({ message: "Request canceled" });
   } catch (err) {
