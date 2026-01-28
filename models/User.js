@@ -31,9 +31,13 @@ const NotificationSchema = new mongoose.Schema({
 const ExperienceSchema = new mongoose.Schema({
   title: String,
   company: String,
+  employmentType: String,
+  location: String,
+  locationType: String,
   startDate: String,
   endDate: String,
   description: String,
+  skills: [String],
 });
 
 const EducationSchema = new mongoose.Schema({
