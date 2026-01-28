@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const authenticate = require("../../middleware/authMiddleware");
 const Connect = require("../../models/Connect");
-
-const Connect = require("../../models/Connect");
 const User = require("../../models/User");
 
 // Receiver rejects a pending request
