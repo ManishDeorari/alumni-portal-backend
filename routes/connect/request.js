@@ -45,11 +45,19 @@ router.post("/", authenticate, async (req, res) => {
     await connection.save();
 
     // Send notification to recipient
-    receiver.notifications.push({
-      type: "connect",
+    const Notification = require("../../models/Notification");
+    const newNotification = new Notification({
+      sender: from,
+      receiver: to,
+      type: "connect_request",
       message: `${sender.name} sent you a connection request`,
-      from: from
     });
+    await newNotification.save();
+
+    // Emit socket event to the receiver's room
+    if (req.io) {
+      req.io.to(to.toString()).emit("newNotification", newNotification);
+    }
 
     await sender.save();
     await receiver.save();

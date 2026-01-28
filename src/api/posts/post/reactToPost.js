@@ -48,6 +48,23 @@ module.exports = async (req, res) => {
       req.io.emit("postReacted", plainPost);
     }
 
+    // Trigger Notification if the reactor is not the post owner
+    if (userId !== updatedPost.user._id.toString()) {
+      const Notification = require("../../../../models/Notification");
+      const newNotification = new Notification({
+        sender: userId,
+        receiver: updatedPost.user._id,
+        type: "post_like",
+        message: `${req.user.name} reacted with ${emoji} to your post`,
+        postId: id,
+      });
+      await newNotification.save();
+
+      if (req.io) {
+        req.io.to(updatedPost.user._id.toString()).emit("newNotification", newNotification);
+      }
+    }
+
     res.status(200).json(plainPost);
   } catch (error) {
     console.error("🔥 Reaction error:", error.message);

@@ -25,6 +25,7 @@ const rolloverConfigRoute = require("./routes/admin/rolloverConfig");
 
 // ✅ NEW: Admin Dashboard routes
 const adminRoutes = require("./routes/admin");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -76,6 +77,11 @@ app.use((req, res, next) => {
 io.on("connection", (socket) => {
   console.log("📡 New socket connection:", socket.id);
 
+  socket.on("join", (userId) => {
+    socket.join(userId);
+    console.log(`👤 User ${userId} joined their notification room`);
+  });
+
   socket.on("disconnect", () => {
     console.log("❌ Socket disconnected:", socket.id);
   });
@@ -112,6 +118,7 @@ app.use("/api/connect/sent", connectSentRoute);
 app.use("/api/connect/user", userConnectionsRoute);
 app.use("/api/admin", yearRolloverRoute);
 app.use("/api/admin", rolloverConfigRoute);
+app.use("/api/notifications", notificationRoutes);
 
 // ✅ Global Error Handler
 app.use((err, req, res, next) => {

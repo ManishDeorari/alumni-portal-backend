@@ -42,11 +42,19 @@ router.post("/", authenticate, async (req, res) => {
     if (!senderConnStr.includes(to.toString())) sender.connections.push(to);
 
     // Notification
-    sender.notifications.push({
+    const Notification = require("../../models/Notification");
+    const newNotification = new Notification({
+      sender: to,
+      receiver: from,
       type: "connect_accept",
       message: `${receiver.name} accepted your connection request`,
-      from: to
     });
+    await newNotification.save();
+
+    // Emit socket event to the sender's room
+    if (req.io) {
+      req.io.to(from.toString()).emit("newNotification", newNotification);
+    }
 
     await receiver.save();
     await sender.save();

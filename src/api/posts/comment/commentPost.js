@@ -26,6 +26,23 @@ const commentPost = async (req, res) => {
     // Emit socket update
     req.io.emit("postUpdated", updatedPost);
 
+    // Trigger Notification if the commenter is not the post owner
+    if (userId.toString() !== updatedPost.user._id.toString()) {
+      const Notification = require("../../../../models/Notification");
+      const newNotification = new Notification({
+        sender: userId,
+        receiver: updatedPost.user._id,
+        type: "post_comment",
+        message: `${req.user.name} commented on your post: "${text.substring(0, 20)}${text.length > 20 ? "..." : ""}"`,
+        postId: postId,
+      });
+      await newNotification.save();
+
+      if (req.io) {
+        req.io.to(updatedPost.user._id.toString()).emit("newNotification", newNotification);
+      }
+    }
+
     // Return full updated post (✅ Only one response!)
     res.status(201).json(updatedPost);
   } catch (error) {

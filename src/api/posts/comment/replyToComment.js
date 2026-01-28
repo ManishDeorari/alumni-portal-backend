@@ -30,6 +30,25 @@ const replyToComment = async (req, res) => {
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
     req.io.emit("postUpdated", updated);
+
+    // Trigger Notification for the comment owner (if the replier is not the comment owner)
+    if (req.user._id.toString() !== comment.user.toString()) {
+      const Notification = require("../../../../models/Notification");
+      const newNotification = new Notification({
+        sender: req.user._id,
+        receiver: comment.user,
+        type: "comment_reply",
+        message: `${req.user.name} replied to your comment: "${text.substring(0, 20)}${text.length > 20 ? "..." : ""}"`,
+        postId: postId,
+        commentId: commentId,
+      });
+      await newNotification.save();
+
+      if (req.io) {
+        req.io.to(comment.user.toString()).emit("newNotification", newNotification);
+      }
+    }
+
     res.json(updated);
   } catch (err) {
     console.error("❌ Reply failed:", {
