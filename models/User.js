@@ -27,6 +27,37 @@ const NotificationSchema = new mongoose.Schema({
   isRead: { type: Boolean, default: false },
 });
 
+// ===================== Sub-Schemas =====================
+const ExperienceSchema = new mongoose.Schema({
+  title: String,
+  company: String,
+  startDate: String,
+  endDate: String,
+  description: String,
+});
+
+const EducationSchema = new mongoose.Schema({
+  degree: String,
+  institution: String,
+  year: String,
+  description: String,
+});
+
+const WorkProfileSchema = new mongoose.Schema({
+  functionalArea: String,
+  subFunctionalArea: String,
+  experience: String,
+  industry: String,
+});
+
+const JobPreferencesSchema = new mongoose.Schema({
+  functionalArea: String,
+  preferredLocations: [String],
+  noticePeriod: String,
+  salary: String,
+  resumeLink: String,
+});
+
 // ===================== Main User Schema =====================
 const UserSchema = new mongoose.Schema(
   {
@@ -48,6 +79,19 @@ const UserSchema = new mongoose.Schema(
     year: String,
     profilePicture: String,
     bannerImage: String,
+
+    // Detailed Profile Fields
+    phone: String,
+    address: String,
+    whatsapp: String,
+    linkedin: String,
+
+    education: [EducationSchema],
+    experience: [ExperienceSchema],
+    skills: [String],
+
+    workProfile: { type: WorkProfileSchema, default: {} },
+    jobPreferences: { type: JobPreferencesSchema, default: {} },
 
     // Networking connections
     connections: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
