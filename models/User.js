@@ -42,8 +42,11 @@ const ExperienceSchema = new mongoose.Schema({
 
 const EducationSchema = new mongoose.Schema({
   degree: String,
+  fieldOfStudy: String,
   institution: String,
-  year: String,
+  location: String,
+  startDate: String,
+  endDate: String,
   description: String,
 });
 
