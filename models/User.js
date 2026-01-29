@@ -9,6 +9,7 @@ const PointsSchema = new mongoose.Schema({
   campusEngagement: { type: Number, default: 0 },
   innovationSupport: { type: Number, default: 0 },
   alumniParticipation: { type: Number, default: 0 },
+  other: { type: Number, default: 0 },
   total: { type: Number, default: 0 },
 });
 

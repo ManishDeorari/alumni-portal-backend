@@ -57,7 +57,7 @@ router.post("/config", authenticate, verifyMainAdmin, async (req, res) => {
 // Manual award points (Main Admin only)
 router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => {
     try {
-        const { search, amount, message } = req.body; // search can be name or enrollment number
+        const { search, amount, message, category = "other" } = req.body; // search can be name or enrollment number
 
         if (!search || !amount) {
             return res.status(400).json({ message: "Search term and amount required" });
@@ -76,12 +76,26 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
         }
 
         if (!user.points) user.points = { total: 0 };
-        user.points.total = (user.points.total || 0) + Number(amount);
+
+        // Award to specific category
+        const awardAmount = Number(amount);
+        user.points[category] = (user.points[category] || 0) + awardAmount;
+
+        // Ensure total is correctly calculated as sum of all categories plus any previous "uncategorized" total
+        // We'll recalculate from all fields to be safe
+        const categories = [
+            "profileCompletion", "studentEngagement", "referrals",
+            "contentContribution", "campusEngagement", "innovationSupport",
+            "alumniParticipation", "other"
+        ];
+
+        user.points.total = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
 
         // Add notification
         user.notifications.push({
             type: "points_awarded",
-            message: message || `You have been awarded ${amount} points by the Admin.`,
+            from: req.user._id,
+            message: message || `You have been awarded ${amount} points by the Admin for ${category.replace(/([A-Z])/g, ' $1').toLowerCase()}.`,
             date: new Date(),
         });
 
