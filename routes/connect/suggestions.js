@@ -45,7 +45,7 @@ router.get("/", authMiddleware, async (req, res) => {
       { $limit: 6 },
       {
         $project: {
-          name: 1, course: 1, profilePicture: 1, enrollmentNumber: 1, workProfile: 1, skills: 1
+          name: 1, course: 1, profilePicture: 1, enrollmentNumber: 1, workProfile: 1, skills: 1, connections_count: 1
         }
       }
     ]);
