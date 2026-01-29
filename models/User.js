@@ -13,7 +13,6 @@ const PointsSchema = new mongoose.Schema({
   posts: { type: Number, default: 0 },
   comments: { type: Number, default: 0 },
   likes: { type: Number, default: 0 },
-  replies: { type: Number, default: 0 },
   other: { type: Number, default: 0 },
   total: { type: Number, default: 0 },
 });
