@@ -108,7 +108,7 @@ router.delete("/delete-user/:id", authenticate, verifyAdmin, async (req, res) =>
 // ✅ 6️⃣ Leaderboard — view top alumni by points
 router.get("/leaderboard", authenticate, verifyAdmin, async (req, res) => {
   try {
-    const topUsers = await User.find({ approved: true, role: "alumni" })
+    const topUsers = await User.find({ approved: true, role: "alumni", "points.total": { $gt: 0 } })
       .sort({ "points.total": -1 })
       .limit(50)
       .select("name email role points profilePicture");
@@ -136,7 +136,7 @@ router.get("/leaderboard/last-year", authenticate, verifyAdmin, async (req, res)
   try {
     const users = await User.find({
       role: "alumni",
-      lastYearPoints: { $ne: null },
+      "lastYearPoints.total": { $gt: 0 },
     })
       .sort({ "lastYearPoints.total": -1 })
       .limit(50)
