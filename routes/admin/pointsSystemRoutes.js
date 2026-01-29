@@ -92,22 +92,22 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
 
         user.points.total = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
 
-        // Add notification
-        user.notifications.push({
-            type: "points_awarded",
-            from: req.user._id,
-            message: message || `You have been awarded ${amount} points by the Admin for ${category.replace(/([A-Z])/g, ' $1').toLowerCase()}.`,
-            date: new Date(),
-        });
-
-        await user.save();
-
-        // Emit socket event if needed or just return success
-        if (req.io) {
-            req.io.to(user._id.toString()).emit("notification", {
-                type: "points_awarded",
-                message: message || `You have been awarded ${amount} points by the Admin.`,
+        // Add notification using Notification model
+        try {
+            const Notification = require("../../models/Notification");
+            const newNotification = new Notification({
+                sender: req.user._id,
+                receiver: user._id,
+                type: "admin_notice",
+                message: message || `You have been awarded ${amount} points for ${category.replace(/([A-Z])/g, ' $1').toLowerCase()}.`,
             });
+            await newNotification.save();
+
+            if (req.io) {
+                req.io.to(user._id.toString()).emit("newNotification", newNotification);
+            }
+        } catch (noteErr) {
+            console.error("❌ Failed to send manual award notice:", noteErr.message);
         }
 
         res.json({ message: "Points awarded successfully", user: { name: user.name, totalPoints: user.points.total } });

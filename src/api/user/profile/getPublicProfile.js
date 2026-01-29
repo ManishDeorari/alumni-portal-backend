@@ -65,6 +65,24 @@ module.exports = async (req, res) => {
         user.visitors.push({ user: visitorId, lastVisit: now });
 
         await user.save();
+
+        // 🔔 Send Notification
+        try {
+          const Notification = require("../../../../models/Notification");
+          const visitor = await User.findById(visitorId).select("name");
+          const newNotification = new Notification({
+            sender: visitorId,
+            receiver: targetUserId,
+            type: "profile_visit",
+            message: `visited your profile.`,
+          });
+          await newNotification.save();
+          if (req.io) {
+            req.io.to(targetUserId.toString()).emit("newNotification", newNotification);
+          }
+        } catch (noteErr) {
+          console.error("❌ Failed to send visit notification:", noteErr.message);
+        }
       }
     }
 

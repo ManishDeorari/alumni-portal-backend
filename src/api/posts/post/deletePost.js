@@ -6,8 +6,31 @@ const deletePost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    if (post.user.toString() !== req.user.id)
+    const User = require("../../../../models/User");
+    const currentUser = await User.findById(req.user.id);
+    const isAdmin = currentUser && currentUser.isMainAdmin;
+
+    if (post.user.toString() !== req.user.id && !isAdmin)
       return res.status(403).json({ message: "Unauthorized" });
+
+    // Handle Admin notification if deleting someone else's post
+    if (isAdmin && post.user.toString() !== req.user.id) {
+      try {
+        const Notification = require("../../../../models/Notification");
+        const adminNote = new Notification({
+          sender: req.user.id,
+          receiver: post.user,
+          type: "admin_notice",
+          message: "Your post has been removed by the Admin for violating community guidelines.",
+        });
+        await adminNote.save();
+        if (req.io) {
+          req.io.to(post.user.toString()).emit("newNotification", adminNote);
+        }
+      } catch (noteErr) {
+        console.error("❌ Failed to send admin deletion notice:", noteErr.message);
+      }
+    }
 
     for (const image of post.images || []) {
       if (image.public_id) {
