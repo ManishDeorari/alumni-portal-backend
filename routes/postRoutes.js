@@ -23,7 +23,7 @@ const Post = require("../models/Post"); // Required for GET /posts/:id
 
 // ---------------- GET ALL POSTS ----------------
 router.get("/", getPosts);
-router.get("/posts/me", auth, getMyPosts);
+router.get("/me", auth, getMyPosts);
 
 // ---------------- CREATE POST ----------------
 router.post("/", auth, createPost);

@@ -5,8 +5,14 @@ const getPosts = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const type = req.query.type || "Regular";
-
-    const filter = type === "all" ? {} : { type };
+    let filter = {};
+    if (type === "all") {
+      filter = {};
+    } else if (type === "Regular") {
+      filter = { $or: [{ type: "Regular" }, { type: { $exists: false } }, { type: null }] };
+    } else {
+      filter = { type };
+    }
 
     const posts = await Post.find(filter)
       .sort({ createdAt: -1 })
