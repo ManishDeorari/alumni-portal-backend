@@ -48,6 +48,27 @@ module.exports = async (req, res) => {
       req.io.emit("postReacted", plainPost);
     }
 
+    // ✅ Award Points Logic (if it's a NEW reaction)
+    if (!userAlreadyReacted && req.user.role === "alumni") {
+      try {
+        const User = require("../../../../models/User");
+        const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
+        const user = await User.findById(userId);
+        const config = (await PointsSystemConfig.findOne()) || { likePoints: 2 };
+
+        if (!user.points) user.points = { total: 0 };
+        const pts = config.likePoints || 2;
+
+        user.points.total = (user.points.total || 0) + pts;
+        user.points.studentEngagement = (user.points.studentEngagement || 0) + pts;
+
+        await user.save();
+        console.log(`✅ Awarded ${pts} points to user ${user.name} for reacting.`);
+      } catch (awardErr) {
+        console.error("❌ Failed to award points for reaction:", awardErr.message);
+      }
+    }
+
     // Trigger Notification if the reactor is not the post owner
     if (userId !== updatedPost.user._id.toString()) {
       const Notification = require("../../../../models/Notification");

@@ -43,6 +43,27 @@ const commentPost = async (req, res) => {
       }
     }
 
+    // ✅ Award Points Logic (using User model and PointsSystemConfig)
+    if (req.user.role === "alumni") {
+      try {
+        const User = require("../../../../models/User");
+        const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
+        const user = await User.findById(userId);
+        const config = (await PointsSystemConfig.findOne()) || { commentPoints: 3 };
+
+        if (!user.points) user.points = { total: 0 };
+        const pts = config.commentPoints || 3;
+
+        user.points.total = (user.points.total || 0) + pts;
+        user.points.contentContribution = (user.points.contentContribution || 0) + pts;
+
+        await user.save();
+        console.log(`✅ Awarded ${pts} points to user ${user.name} for commenting.`);
+      } catch (awardErr) {
+        console.error("❌ Failed to award points for comment:", awardErr.message);
+      }
+    }
+
     // Return full updated post (✅ Only one response!)
     res.status(201).json(updatedPost);
   } catch (error) {

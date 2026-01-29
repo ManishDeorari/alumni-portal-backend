@@ -162,4 +162,38 @@ router.post("/trigger-rollover", authenticate, verifyMainAdmin, async (req, res)
     }
 });
 
+// Sync all users' points (fix discrepancies)
+router.post("/sync-points", authenticate, verifyMainAdmin, async (req, res) => {
+    try {
+        const alumniUsers = await User.find({ role: "alumni" });
+        const categories = [
+            "profileCompletion", "studentEngagement", "referrals",
+            "contentContribution", "campusEngagement", "innovationSupport",
+            "alumniParticipation", "other"
+        ];
+
+        let syncedCount = 0;
+        for (const user of alumniUsers) {
+            if (!user.points) user.points = { total: 0 };
+
+            const currentTotal = user.points.total || 0;
+            const sumOfCategories = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
+
+            if (currentTotal !== sumOfCategories) {
+                const discrepancy = currentTotal - sumOfCategories;
+                // Assign discrepancy to 'other' (can be positive or negative to make it match)
+                user.points.other = (user.points.other || 0) + discrepancy;
+                // Re-verify total
+                user.points.total = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
+                await user.save();
+                syncedCount++;
+            }
+        }
+        res.json({ message: `Successfully synced ${syncedCount} users.`, syncedCount });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Sync failed" });
+    }
+});
+
 module.exports = router;
