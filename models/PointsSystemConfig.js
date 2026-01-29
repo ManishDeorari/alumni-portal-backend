@@ -5,6 +5,7 @@ const PointsSystemConfigSchema = new mongoose.Schema({
     connectionPoints: { type: Number, default: 10 },
     postPoints: { type: Number, default: 10 },
     commentPoints: { type: Number, default: 3 },
+    replyPoints: { type: Number, default: 3 },
     likePoints: { type: Number, default: 2 },
     postLimitCount: { type: Number, default: 3 },
     postLimitDays: { type: Number, default: 7 },

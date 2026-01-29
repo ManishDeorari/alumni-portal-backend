@@ -86,7 +86,8 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
         const categories = [
             "profileCompletion", "studentEngagement", "referrals",
             "contentContribution", "campusEngagement", "innovationSupport",
-            "alumniParticipation", "other"
+            "alumniParticipation", "connections", "posts", "comments",
+            "likes", "replies", "other"
         ];
 
         user.points.total = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
@@ -140,6 +141,12 @@ router.post("/trigger-rollover", authenticate, verifyMainAdmin, async (req, res)
                 campusEngagement: 0,
                 innovationSupport: 0,
                 alumniParticipation: 0,
+                connections: 0,
+                posts: 0,
+                comments: 0,
+                likes: 0,
+                replies: 0,
+                other: 0,
                 total: 0,
             };
 
@@ -169,7 +176,8 @@ router.post("/sync-points", authenticate, verifyMainAdmin, async (req, res) => {
         const categories = [
             "profileCompletion", "studentEngagement", "referrals",
             "contentContribution", "campusEngagement", "innovationSupport",
-            "alumniParticipation", "other"
+            "alumniParticipation", "connections", "posts", "comments",
+            "likes", "replies", "other"
         ];
 
         let syncedCount = 0;

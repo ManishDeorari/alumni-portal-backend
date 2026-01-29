@@ -69,6 +69,10 @@ router.post("/", authenticate, async (req, res) => {
         if (!user.points) user.points = { total: 0 };
         user.points.total = (user.points.total || 0) + pointsToAdd;
 
+        if (user.points.connections === undefined) user.points.connections = 0;
+        user.points.connections += pointsToAdd;
+
+        // Also keep studentEngagement if it's considered part of it, but user wants granular.
         if (user.points.studentEngagement === undefined) user.points.studentEngagement = 0;
         user.points.studentEngagement += pointsToAdd;
 
