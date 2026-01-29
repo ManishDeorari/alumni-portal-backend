@@ -17,33 +17,59 @@ router.get("/", authMiddleware, async (req, res) => {
       ...(currentUser.pendingRequests || []).map(id => id.toString())
     ];
 
-    // Basic suggestion logic: find users with same course, industry, or skills
-    const suggestions = await User.find({
+    // 1. New Alumni (Recently joined)
+    const newAlumni = await User.find({
       _id: { $nin: excludeIds },
+      role: "alumni",
+      approved: true
+    })
+      .select("name course profilePicture enrollmentNumber workProfile skills createdAt")
+      .sort({ createdAt: -1 })
+      .limit(6);
+
+    // 2. Top Connections (Most connections)
+    const topConnections = await User.aggregate([
+      {
+        $match: {
+          _id: { $nin: [...excludeIds.map(id => new (require("mongoose")).Types.ObjectId(id)), ...newAlumni.map(u => u._id)] },
+          role: "alumni",
+          approved: true
+        }
+      },
+      {
+        $addFields: {
+          connections_count: { $size: { $ifNull: ["$connections", []] } }
+        }
+      },
+      { $sort: { connections_count: -1 } },
+      { $limit: 6 },
+      {
+        $project: {
+          name: 1, course: 1, profilePicture: 1, enrollmentNumber: 1, workProfile: 1, skills: 1
+        }
+      }
+    ]);
+
+    // 3. Related People (Same course or industry)
+    const relatedPeople = await User.find({
+      _id: { $nin: [...excludeIds, ...newAlumni.map(u => u._id.toString()), ...topConnections.map(u => u._id.toString())] },
+      role: "alumni",
+      approved: true,
       $or: [
         { course: currentUser.course },
-        { "workProfile.industry": currentUser.workProfile?.industry },
-        { skills: { $in: currentUser.skills || [] } }
+        { "workProfile.industry": currentUser.workProfile?.industry }
       ]
     })
       .select("name course profilePicture enrollmentNumber workProfile skills")
-      .limit(10);
+      .limit(6);
 
-    // If not enough suggestions, add some random new alumni
-    if (suggestions.length < 5) {
-      const moreSuggestions = await User.find({
-        _id: { $nin: [...excludeIds, ...suggestions.map(s => s._id)] }
-      })
-        .select("name course profilePicture enrollmentNumber workProfile skills")
-        .sort({ createdAt: -1 })
-        .limit(10 - suggestions.length);
-
-      suggestions.push(...moreSuggestions);
-    }
-
-    res.json(suggestions);
+    res.json({
+      newAlumni,
+      topConnections,
+      relatedPeople
+    });
   } catch (err) {
-    console.error(err);
+    console.error("❌ Suggestions Error:", err.message);
     res.status(500).json({ message: err.message });
   }
 });
