@@ -78,10 +78,10 @@ const UserSchema = new mongoose.Schema(
     password: { type: String, required: true },
 
     // Alumni-only field
-    enrollmentNumber: { type: String },
+    enrollmentNumber: { type: String, unique: true, sparse: true },
 
     // Faculty-only field
-    employeeId: { type: String },
+    employeeId: { type: String, unique: true, sparse: true },
 
     // Common optional profile fields
     bio: String,

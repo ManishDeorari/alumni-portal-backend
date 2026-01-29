@@ -65,6 +65,8 @@ const io = new Server(server, {
 console.log("📡 Attempting MongoDB connection...");
 connectDB().then(async () => {
   await createMainAdmin(); // ensure main admin exists
+  const User = require("./models/User");
+  await User.syncIndexes();
 });
 
 // ✅ Inject `io` into every request
