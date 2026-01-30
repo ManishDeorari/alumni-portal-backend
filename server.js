@@ -123,6 +123,7 @@ app.use("/api/admin", yearRolloverRoute);
 app.use("/api/admin", rolloverConfigRoute);
 app.use("/api/admin-points-mgmt", pointsSystemRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/messages", require("./routes/messageRoutes")); // ✅ Message Routes
 
 // ✅ Global Error Handler
 app.use((err, req, res, next) => {
