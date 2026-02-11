@@ -1,49 +1,35 @@
 const nodemailer = require("nodemailer");
-const dns = require("dns");
-
-// Force IPv4 lookup used by nodejs
-if (dns.setDefaultResultOrder) {
-    dns.setDefaultResultOrder("ipv4first");
-}
 
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp.gmail.com",
     port: Number(process.env.SMTP_PORT) || 587,
-    secure: false, // true for 465, false for other ports
+    secure: false,
     auth: {
         user: process.env.SMTP_USER || process.env.GMAIL_USER,
         pass: process.env.SMTP_PASS || process.env.GMAIL_PASS,
     },
-    connectionTimeout: 10000, // 10 seconds timeout
-    greetingTimeout: 5000,    // 5 seconds greeting timeout
-    socketTimeout: 10000,     // 10 seconds socket timeout
+    connectionTimeout: 10000,
+    greetingTimeout: 5000,
+    socketTimeout: 10000,
 });
 
 const sendEmail = async (to, subject, html) => {
-    // 🛡 Kill Switch: If email is disabled via env var, abort immediately
-    if (process.env.DISABLE_EMAIL === "true") {
-        console.log("⚠️ Email sending is DISABLED via environment variable.");
-        return;
-    }
+    if (process.env.DISABLE_EMAIL === "true") return;
 
     try {
-        const socketHost = process.env.SMTP_HOST || 'DEFAULT(gmail)';
-        console.log(`📧 Attempting to send email to ${to}`);
-        console.log(`   - Host: ${socketHost}`);
-        console.log(`   - Port: ${process.env.SMTP_PORT || 587}`);
-        console.log(`   - User: ${process.env.SMTP_USER || process.env.GMAIL_USER || 'manishdeorari377@gmail.com'}`);
+        const fromEmail = process.env.SMTP_USER || process.env.GMAIL_USER || "manishdeorari377@gmail.com";
+        console.log(`📧 Sending email to ${to}...`);
 
         const mailOptions = {
-            from: process.env.SMTP_USER || process.env.GMAIL_USER || "manishdeorari377@gmail.com", // Main Admin Email
+            from: fromEmail,
             to,
             subject,
             html,
         };
-        const info = await transporter.sendMail(mailOptions);
-        console.log("✅ Email sent: " + info.response);
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ Email sent to ${to}`);
     } catch (error) {
-        console.error("❌ Error sending email:", error.message);
-        // We log the message but don't rethrow, to prevent crashing the main process if this was awaited
+        console.error("❌ Email error:", error.message);
     }
 };
 
