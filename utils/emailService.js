@@ -21,10 +21,14 @@ const sendEmail = async (to, subject, html) => {
     }
 
     try {
-        console.log(`📧 Attempting to send email to ${to} using host: ${process.env.SMTP_HOST || 'DEFAULT(gmail)'} on port: ${process.env.SMTP_PORT || 587}`);
+        const socketHost = process.env.SMTP_HOST || 'DEFAULT(gmail)';
+        console.log(`📧 Attempting to send email to ${to}`);
+        console.log(`   - Host: ${socketHost}`);
+        console.log(`   - Port: ${process.env.SMTP_PORT || 587}`);
+        console.log(`   - User: ${process.env.SMTP_USER || process.env.GMAIL_USER || 'manishdeorari377@gmail.com'}`);
 
         const mailOptions = {
-            from: process.env.GMAIL_USER || "your-email@gmail.com",
+            from: process.env.SMTP_USER || process.env.GMAIL_USER || "manishdeorari377@gmail.com", // Main Admin Email
             to,
             subject,
             html,
