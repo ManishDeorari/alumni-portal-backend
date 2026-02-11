@@ -6,12 +6,6 @@ if (dns.setDefaultResultOrder) {
     dns.setDefaultResultOrder("ipv4first");
 }
 
-console.log("🚀 Initializing Email Service...");
-console.log("   - SMTP_HOST:", process.env.SMTP_HOST || "smtp-relay.brevo.com");
-console.log("   - SMTP_PORT:", process.env.SMTP_PORT || "2525");
-console.log("   - SMTP_USER:", process.env.SMTP_USER ? `${process.env.SMTP_USER.substring(0, 3)}***` : "MISSING");
-console.log("   - SMTP_PASS:", process.env.SMTP_PASS ? "PRESENT (Length: " + process.env.SMTP_PASS.length + ")" : "MISSING");
-
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
     port: Number(process.env.SMTP_PORT) || 2525,
@@ -26,18 +20,6 @@ const transporter = nodemailer.createTransport({
     connectionTimeout: 20000, // Increased timeout
     greetingTimeout: 20000,
     socketTimeout: 20000,
-});
-
-// Verify connection configuration
-transporter.verify(function (error, success) {
-    if (error) {
-        console.log("❌ SMTP Verification Failed!");
-        console.log("   - Error Message:", error.message);
-        console.log("   - Error Code:", error.code);
-        console.log("   - Response:", error.response);
-    } else {
-        console.log("✅ SMTP Server Connection Verified - Ready to send emails");
-    }
 });
 
 const sendEmail = async (to, subject, html) => {

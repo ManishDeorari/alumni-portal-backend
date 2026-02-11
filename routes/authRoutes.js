@@ -137,6 +137,14 @@ const { sendOTPEmail } = require("../utils/emailService");
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
+
+    // 🛡 Security: Prevent password reset for the main admin
+    if (email === "manishdeorari377@gmail.com") {
+      return res.status(403).json({
+        message: "Password reset is not allowed for this account via the automated system. Please contact the system developer."
+      });
+    }
+
     const user = await User.findOne({ email });
 
     if (!user) {
