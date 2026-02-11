@@ -1,14 +1,20 @@
 const nodemailer = require("nodemailer");
+const dns = require("dns");
+
+// Force IPv4 lookup used by nodejs
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder("ipv4first");
+}
 
 console.log("🚀 Initializing Email Service...");
 console.log("   - SMTP_HOST:", process.env.SMTP_HOST || "smtp-relay.brevo.com");
-console.log("   - SMTP_PORT:", process.env.SMTP_PORT || "587");
+console.log("   - SMTP_PORT:", process.env.SMTP_PORT || "2525");
 console.log("   - SMTP_USER:", process.env.SMTP_USER ? `${process.env.SMTP_USER.substring(0, 3)}***` : "MISSING");
 console.log("   - SMTP_PASS:", process.env.SMTP_PASS ? "PRESENT (Length: " + process.env.SMTP_PASS.length + ")" : "MISSING");
 
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
-    port: Number(process.env.SMTP_PORT) || 587,
+    port: Number(process.env.SMTP_PORT) || 2525,
     secure: false,
     auth: {
         user: process.env.SMTP_USER,
@@ -16,7 +22,10 @@ const transporter = nodemailer.createTransport({
     },
     tls: {
         rejectUnauthorized: false // Helps in some restricted environments
-    }
+    },
+    connectionTimeout: 20000, // Increased timeout
+    greetingTimeout: 20000,
+    socketTimeout: 20000,
 });
 
 // Verify connection configuration
