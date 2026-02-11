@@ -158,5 +158,37 @@ router.get("/leaderboard/last-year", authenticate, verifyAdmin, async (req, res)
   }
 });
 
+// ✅ 8️⃣ Export Alumni Data (Advanced Filtering)
+router.get("/export-alumni", authenticate, verifyAdmin, async (req, res) => {
+  const { query, course, year, industry } = req.query;
+
+  try {
+    const filter = { role: "alumni", approved: true };
+
+    if (query) {
+      const regex = new RegExp(query, "i");
+      filter.$or = [
+        { name: regex },
+        { email: regex },
+        { enrollmentNumber: regex },
+        { course: regex }
+      ];
+    }
+
+    if (course) filter.course = course;
+    if (year) filter.year = year;
+    if (industry) filter["workProfile.industry"] = { $regex: new RegExp(industry, "i") };
+
+    const users = await User.find(filter)
+      .select("name email enrollmentNumber phone whatsapp linkedin address education experience workProfile jobPreferences course year")
+      .sort({ name: 1 });
+
+    res.json(users);
+  } catch (err) {
+    console.error("Export Search Error:", err);
+    res.status(500).json({ message: "Search failed", error: err.message });
+  }
+});
+
 module.exports = router;
 
