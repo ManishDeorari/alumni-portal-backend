@@ -56,6 +56,8 @@ router.post("/year-end-rollover", authenticate, verifyAdmin, async (req, res) =>
         total: 0,
       };
 
+      user.profileCompletionAwarded = false; // Reset so they can re-earn 50 points
+
       await user.save();
     }
 

@@ -35,24 +35,40 @@ module.exports = async (req, res) => {
       new: true,
     }).select("-password");
 
-    // ✅ Award Points Logic (if profile is "completed")
-    // For simplicity, we award points on the first detailed update if not already awarded
+    // ✅ Award Points Logic (Strict Checklist)
     if (updatedUser.role === "alumni" && !updatedUser.profileCompletionAwarded) {
       const config = await PointsSystemConfig.findOne() || { profileCompletionPoints: 50 };
 
-      // Simple check: if they filled some bio or address or education
-      const isDetailed = updatedUser.bio || updatedUser.address || (updatedUser.education && updatedUser.education.length > 0);
+      const hasProfilePic = updatedUser.profilePicture && !updatedUser.profilePicture.includes("default-profile.jpg");
+      const hasBanner = updatedUser.bannerImage && !updatedUser.bannerImage.includes("default_banner.jpg");
+      const hasPhone = updatedUser.phone && updatedUser.phone !== "Not provided";
+      const hasAddress = updatedUser.address && updatedUser.address !== "Not set";
+      const hasWhatsApp = updatedUser.whatsapp && updatedUser.whatsapp !== "Not linked";
+      const hasLinkedIn = updatedUser.linkedin && updatedUser.linkedin !== "Not linked";
+      const hasBio = updatedUser.bio && updatedUser.bio.trim().length > 0;
+      const hasEducation = updatedUser.education && updatedUser.education.length > 0;
+      const hasExperience = updatedUser.experience && updatedUser.experience.length > 0;
 
-      if (isDetailed) {
+      const hasWorkProfile = updatedUser.workProfile &&
+        (updatedUser.workProfile.functionalArea || updatedUser.workProfile.industry);
+
+      const hasJobPreferences = updatedUser.jobPreferences &&
+        (updatedUser.jobPreferences.functionalArea || updatedUser.jobPreferences.preferredLocations?.length > 0);
+
+      const isCompleted = hasProfilePic && hasBanner && hasPhone && hasAddress &&
+        hasWhatsApp && hasLinkedIn && hasBio && hasEducation &&
+        hasExperience && hasWorkProfile && hasJobPreferences;
+
+      if (isCompleted) {
         if (!updatedUser.points) updatedUser.points = { total: 0 };
-        updatedUser.points.total = (updatedUser.points.total || 0) + (config.profileCompletionPoints || 50);
+        const awardAmount = config.profileCompletionPoints || 50;
 
-        if (updatedUser.points.profileCompletion === undefined) updatedUser.points.profileCompletion = 0;
-        updatedUser.points.profileCompletion += (config.profileCompletionPoints || 50);
+        updatedUser.points.total = (updatedUser.points.total || 0) + awardAmount;
+        updatedUser.points.profileCompletion = (updatedUser.points.profileCompletion || 0) + awardAmount;
 
         updatedUser.profileCompletionAwarded = true;
         await updatedUser.save();
-        console.log(`✅ Awarded ${config.profileCompletionPoints} points to user ${updatedUser.name} for profile completion.`);
+        console.log(`✅ Awarded ${awardAmount} points to user ${updatedUser.name} for FULL profile completion.`);
       }
     }
 
