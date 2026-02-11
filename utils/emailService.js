@@ -1,22 +1,12 @@
 const nodemailer = require("nodemailer");
-const dns = require("dns");
-
-// Force IPv4 lookup used by nodejs
-if (dns.setDefaultResultOrder) {
-    dns.setDefaultResultOrder("ipv4first");
-}
 
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT) || 587,
     secure: false, // true for 465, false for other ports
     auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS, // App Password
-    },
-    tls: {
-        ciphers: "SSLv3",
-        rejectUnauthorized: false,
+        user: process.env.SMTP_USER || process.env.GMAIL_USER,
+        pass: process.env.SMTP_PASS || process.env.GMAIL_PASS,
     },
     connectionTimeout: 10000, // 10 seconds timeout
     greetingTimeout: 5000,    // 5 seconds greeting timeout
