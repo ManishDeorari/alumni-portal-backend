@@ -1,10 +1,10 @@
 const nodemailer = require("nodemailer");
 
-if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.warn("⚠️ SMTP Credentials missing! Email will likely fail to authenticate.");
-    console.log("   Checking ENV: SMTP_USER =", process.env.SMTP_USER ? "FOUND" : "MISSING");
-    console.log("   Checking ENV: SMTP_PASS =", process.env.SMTP_PASS ? "FOUND" : "MISSING");
-}
+console.log("🚀 Initializing Email Service...");
+console.log("   - SMTP_HOST:", process.env.SMTP_HOST || "smtp-relay.brevo.com");
+console.log("   - SMTP_PORT:", process.env.SMTP_PORT || "587");
+console.log("   - SMTP_USER:", process.env.SMTP_USER ? `${process.env.SMTP_USER.substring(0, 3)}***` : "MISSING");
+console.log("   - SMTP_PASS:", process.env.SMTP_PASS ? "PRESENT (Length: " + process.env.SMTP_PASS.length + ")" : "MISSING");
 
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
@@ -22,9 +22,12 @@ const transporter = nodemailer.createTransport({
 // Verify connection configuration
 transporter.verify(function (error, success) {
     if (error) {
-        console.log("❌ SMTP Verification Error:", error.message);
+        console.log("❌ SMTP Verification Failed!");
+        console.log("   - Error Message:", error.message);
+        console.log("   - Error Code:", error.code);
+        console.log("   - Response:", error.response);
     } else {
-        console.log("✅ SMTP Server is ready to take messages");
+        console.log("✅ SMTP Server Connection Verified - Ready to send emails");
     }
 });
 
