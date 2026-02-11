@@ -35,8 +35,9 @@ const sendEmail = async (to, subject, html) => {
     if (process.env.DISABLE_EMAIL === "true") return;
 
     try {
-        const fromEmail = process.env.SMTP_USER || process.env.GMAIL_USER || "manishdeorari377@gmail.com";
-        console.log(`📧 Sending email to ${to}...`);
+        // Use a verified sender email. Brevo login (SMTP_USER) is often different from the sender email.
+        const fromEmail = process.env.EMAIL_FROM || "manishdeorari377@gmail.com";
+        console.log(`📧 Sending email to ${to} from ${fromEmail}...`);
 
         const mailOptions = {
             from: fromEmail,
