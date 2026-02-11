@@ -8,7 +8,16 @@ module.exports = async function (req, res, next) {
     return res.status(401).json({ message: "No token, authorization denied" });
   }
 
-  const token = authHeader.split(" ")[1];
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2) {
+    return res.status(401).json({ message: "Token format invalid" });
+  }
+
+  const token = parts[1];
+
+  if (!token || token === "null" || token === "undefined") {
+    return res.status(401).json({ message: "Token is null or undefined" });
+  }
 
   try {
     // Verify token
