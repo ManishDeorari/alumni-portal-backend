@@ -131,4 +131,69 @@ router.post("/reset-password", authMiddleware, async (req, res) => {
   }
 });
 
+const { sendOTPEmail } = require("../utils/emailService");
+
+// ======================== FORGOT PASSWORD (OTP) ==========================
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User with this email does not exist" });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save OTP and expiration (60 seconds)
+    user.resetPasswordOTP = otp;
+    user.resetPasswordExpires = Date.now() + 60000; // 60 seconds
+    await user.save();
+
+    // Send OTP via email
+    await sendOTPEmail(user.email, otp);
+
+    res.json({ message: "OTP sent to your email. Expires in 60 seconds." });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Server error processing request" });
+  }
+});
+
+// ======================== RESET PASSWORD WITH OTP ==========================
+router.post("/reset-password-with-otp", async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const user = await User.findOne({
+      email,
+      resetPasswordOTP: otp,
+      resetPasswordExpires: { $gt: Date.now() }, // Check if not expired
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+
+    // Clear OTP fields
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.json({ message: "Password has been reset successfully. Please login." });
+  } catch (error) {
+    console.error("Reset password with OTP error:", error);
+    res.status(500).json({ message: "Server error resetting password" });
+  }
+});
+
 module.exports = router;

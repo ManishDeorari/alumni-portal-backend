@@ -3,6 +3,8 @@ const router = express.Router();
 const User = require("../models/User");
 const authenticate = require("../middleware/authMiddleware");
 
+const { sendApprovalEmail, sendRejectionEmail } = require("../utils/emailService");
+
 // ✅ Middleware to check admin access
 const verifyAdmin = async (req, res, next) => {
   try {
@@ -39,8 +41,12 @@ router.put("/approve/:id", authenticate, verifyAdmin, async (req, res) => {
     user.approved = true;
     await user.save();
 
+    // Send email notification
+    await sendApprovalEmail(user);
+
     res.json({ message: `${user.name} has been approved successfully!` });
   } catch (error) {
+    console.error("Approval error:", error);
     res.status(500).json({ message: "Failed to approve user" });
   }
 });
@@ -98,9 +104,13 @@ router.delete("/delete-user/:id", authenticate, verifyAdmin, async (req, res) =>
       return res.status(403).json({ message: "Cannot delete Main Admin" });
     }
 
-    await user.remove();
+    // Send email notification before deleting
+    await sendRejectionEmail(user);
+
+    await user.deleteOne(); // updated from remove() which is deprecated in newer mongoose
     res.json({ message: `${user.name} has been deleted successfully.` });
   } catch (error) {
+    console.error("Delete error:", error);
     res.status(500).json({ message: "Failed to delete user" });
   }
 });
