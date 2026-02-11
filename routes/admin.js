@@ -41,8 +41,8 @@ router.put("/approve/:id", authenticate, verifyAdmin, async (req, res) => {
     user.approved = true;
     await user.save();
 
-    // Send email notification
-    await sendApprovalEmail(user);
+    // Send email notification (Non-blocking)
+    sendApprovalEmail(user).catch(err => console.error("Failed to send approval email:", err.message));
 
     res.json({ message: `${user.name} has been approved successfully!` });
   } catch (error) {
@@ -104,8 +104,8 @@ router.delete("/delete-user/:id", authenticate, verifyAdmin, async (req, res) =>
       return res.status(403).json({ message: "Cannot delete Main Admin" });
     }
 
-    // Send email notification before deleting
-    await sendRejectionEmail(user);
+    // Send email notification before deleting (Non-blocking)
+    sendRejectionEmail(user).catch(err => console.error("Failed to send rejection email:", err.message));
 
     await user.deleteOne(); // updated from remove() which is deprecated in newer mongoose
     res.json({ message: `${user.name} has been deleted successfully.` });
