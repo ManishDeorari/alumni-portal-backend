@@ -31,6 +31,15 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const app = express();
 const server = http.createServer(app);
 
+// ✅ NEW: Health Check Route (Before heavy middleware)
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
+app.get("/", (req, res) => {
+  res.send("✅ API is running...");
+});
+
 // ✅ Use the port Render provides
 const PORT = process.env.PORT || 5000;
 
@@ -97,10 +106,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb", parameterLimit: 5000
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-// ✅ Health Check Route
-app.get("/", (req, res) => {
-  res.send("✅ API is running...");
-});
+
 
 // ✅ Routes
 console.log("🔁 Route setup...");
@@ -132,6 +138,6 @@ app.use((err, req, res, next) => {
 });
 
 // ✅ Start Server
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
