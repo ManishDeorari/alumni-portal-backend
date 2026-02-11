@@ -14,7 +14,15 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendEmail = async (to, subject, html) => {
+    // 🛡 Kill Switch: If email is disabled via env var, abort immediately
+    if (process.env.DISABLE_EMAIL === "true") {
+        console.log("⚠️ Email sending is DISABLED via environment variable.");
+        return;
+    }
+
     try {
+        console.log(`📧 Attempting to send email to ${to} using host: ${process.env.SMTP_HOST || 'DEFAULT(gmail)'} on port: ${process.env.SMTP_PORT || 587}`);
+
         const mailOptions = {
             from: process.env.GMAIL_USER || "your-email@gmail.com",
             to,
@@ -22,9 +30,10 @@ const sendEmail = async (to, subject, html) => {
             html,
         };
         const info = await transporter.sendMail(mailOptions);
-        console.log("Email sent: " + info.response);
+        console.log("✅ Email sent: " + info.response);
     } catch (error) {
-        console.error("Error sending email:", error);
+        console.error("❌ Error sending email:", error.message);
+        // We log the message but don't rethrow, to prevent crashing the main process if this was awaited
     }
 };
 
