@@ -17,42 +17,43 @@ router.get("/", authMiddleware, async (req, res) => {
       ...(currentUser.pendingRequests || []).map(id => id.toString())
     ];
 
-    // 1. New Alumni (Recently joined)
-    const newAlumni = await User.find({
-      _id: { $nin: excludeIds },
-      role: "alumni",
-      approved: true
-    })
-      .select("name course profilePicture enrollmentNumber workProfile skills createdAt")
-      .sort({ createdAt: -1 })
-      .limit(6);
-
-    // 2. Top Connections (Most connections)
-    const topConnections = await User.aggregate([
+    // 1. Random Recommendations (Alumni only)
+    const randomRecommendations = await User.aggregate([
       {
         $match: {
-          _id: { $nin: [...excludeIds.map(id => new (require("mongoose")).Types.ObjectId(id)), ...newAlumni.map(u => u._id)] },
+          _id: { $nin: excludeIds.map(id => new (require("mongoose")).Types.ObjectId(id)) },
           role: "alumni",
           approved: true
         }
       },
-      {
-        $addFields: {
-          connections_count: { $size: { $ifNull: ["$connections", []] } }
-        }
-      },
-      { $sort: { connections_count: -1 } },
-      { $limit: 6 },
+      { $sample: { size: 6 } },
       {
         $project: {
-          name: 1, course: 1, profilePicture: 1, enrollmentNumber: 1, workProfile: 1, skills: 1, connections_count: 1
+          name: 1, course: 1, profilePicture: 1, enrollmentNumber: 1, workProfile: 1, skills: 1
+        }
+      }
+    ]);
+
+    // 2. Faculty and Admin (Influence section replacement)
+    const facultyAndAdmin = await User.aggregate([
+      {
+        $match: {
+          _id: { $nin: excludeIds.map(id => new (require("mongoose")).Types.ObjectId(id)) },
+          role: { $in: ["faculty", "admin"] },
+          approved: true
+        }
+      },
+      { $sample: { size: 6 } },
+      {
+        $project: {
+          name: 1, role: 1, profilePicture: 1, employeeId: 1, bio: 1
         }
       }
     ]);
 
     // 3. Related People (Same course or industry)
     const relatedPeople = await User.find({
-      _id: { $nin: [...excludeIds, ...newAlumni.map(u => u._id.toString()), ...topConnections.map(u => u._id.toString())] },
+      _id: { $nin: [...excludeIds, ...randomRecommendations.map(u => u._id.toString()), ...facultyAndAdmin.map(u => u._id.toString())] },
       role: "alumni",
       approved: true,
       $or: [
@@ -64,8 +65,8 @@ router.get("/", authMiddleware, async (req, res) => {
       .limit(6);
 
     res.json({
-      newAlumni,
-      topConnections,
+      randomRecommendations,
+      facultyAndAdmin,
       relatedPeople
     });
   } catch (err) {

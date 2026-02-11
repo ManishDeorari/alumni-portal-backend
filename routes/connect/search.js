@@ -12,7 +12,7 @@ router.get("/", authMiddleware, async (req, res) => {
     const currentUser = await User.findById(currentUserId);
     if (!currentUser) return res.status(404).json({ message: "User not found" });
 
-    const filter = { _id: { $ne: currentUserId } };
+    const filter = { _id: { $ne: currentUserId }, approved: true };
 
     if (query) {
       const regex = new RegExp(query, "i");
@@ -20,6 +20,7 @@ router.get("/", authMiddleware, async (req, res) => {
         { name: regex },
         { email: regex },
         { enrollmentNumber: regex },
+        { employeeId: regex }, // Also search by Employee ID
         { course: regex }
       ];
     }
