@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
+const Post = require("../models/Post");
+const cloudinary = require("../config/cloudinary");
 const authenticate = require("../middleware/authMiddleware");
 
 const { sendApprovalEmail, sendRejectionEmail, sendDeletionEmail } = require("../utils/emailService");
@@ -110,15 +112,67 @@ router.delete("/delete-user/:id", authenticate, verifyAdmin, async (req, res) =>
     if (!user) return res.status(404).json({ message: "User not found" });
 
     // Prevent deleting main admin
-    if (user.email === "admin@alumniportal.com") {
+    if (user.isMainAdmin || user.email === "admin@alumniportal.com" || user.email === "manishdeorari377@gmail.com") {
       return res.status(403).json({ message: "Cannot delete Main Admin" });
     }
 
-    // Send email notification before deleting (Non-blocking)
-    sendRejectionEmail(user).catch(err => console.error("Failed to send rejection email:", err.message));
+    console.log(`🚀 Starting Deep Delete for user: ${user.name} (${user.email})`);
 
-    await user.deleteOne(); // updated from remove() which is deprecated in newer mongoose
-    res.json({ message: `${user.name} has been deleted successfully.` });
+    // 1. Collect Media for Cloudinary Cleanup
+    const publicIds = [];
+
+    // Profile & Banner (Extract from URL if string)
+    const extractId = (url) => {
+      if (!url || !url.includes("res.cloudinary.com")) return null;
+      try {
+        const parts = url.split("/");
+        const lastPart = parts[parts.length - 1];
+        const folderPart = url.includes("/posts/") ? "posts/" : ""; // Adjust based on your folder structure if known
+        // Simpler: find /upload/ and take everything after (minus version and extension)
+        const afterUpload = url.split("/upload/")[1];
+        if (!afterUpload) return null;
+        const noVersion = afterUpload.replace(/v\d+\//, "");
+        return noVersion.substring(0, noVersion.lastIndexOf("."));
+      } catch (e) { return null; }
+    };
+
+    const profileId = extractId(user.profilePicture);
+    if (profileId) publicIds.push({ id: profileId, type: "image" });
+
+    const bannerId = extractId(user.bannerImage);
+    if (bannerId) publicIds.push({ id: bannerId, type: "image" });
+
+    // 2. Find all User Posts & collect their media
+    const userPosts = await Post.find({ user: user._id });
+    userPosts.forEach(post => {
+      (post.images || []).forEach(img => {
+        if (img.public_id) publicIds.push({ id: img.public_id, type: "image" });
+      });
+      if (post.video?.public_id) {
+        publicIds.push({ id: post.video.public_id, type: "video" });
+      }
+    });
+
+    // 3. Destroy Media on Cloudinary
+    for (const item of publicIds) {
+      try {
+        await cloudinary.uploader.destroy(item.id, { resource_type: item.type });
+        console.log(`🗑 Deleted ${item.type}: ${item.id}`);
+      } catch (err) {
+        console.error(`❌ Cloudinary cleanup failed for ${item.id}:`, err.message);
+      }
+    }
+
+    // 4. Delete Posts from DB
+    await Post.deleteMany({ user: user._id });
+    console.log(`🗑 Deleted ${userPosts.length} posts.`);
+
+    // Send email notification (Existing logic)
+    sendDeletionEmail(user).catch(err => console.error("Failed to send deletion email:", err.message));
+
+    // 5. Finally Delete User
+    await user.deleteOne();
+    res.json({ message: `${user.name} and all their data/media have been deleted successfully.` });
   } catch (error) {
     console.error("Delete error:", error);
     res.status(500).json({ message: "Failed to delete user" });
