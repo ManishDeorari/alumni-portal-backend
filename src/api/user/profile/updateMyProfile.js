@@ -46,7 +46,22 @@ module.exports = async (req, res) => {
       const hasWhatsApp = updatedUser.whatsapp && updatedUser.whatsapp !== "Not linked";
       const hasLinkedIn = updatedUser.linkedin && updatedUser.linkedin !== "Not linked";
       const hasBio = updatedUser.bio && updatedUser.bio.trim().length > 0;
-      const hasEducation = updatedUser.education && updatedUser.education.length > 0;
+
+      // ✅ Revised Education Logic: Mandatory 4 Levels
+      const MANDATORY_DEGREES = [
+        "High School (Secondary - Class 10)",
+        "Intermediate (Higher Secondary - Class 11-12)",
+        "Undergraduate (Bachelor's Degree)",
+        "Postgraduate (Master's Degree)"
+      ];
+
+      const userEducations = updatedUser.education || [];
+      const hasAllMandatory = MANDATORY_DEGREES.every(degree => {
+        const found = userEducations.find(e => e.degree === degree);
+        return found && found.institution && found.startDate && found.endDate;
+      });
+
+      const hasEducation = hasAllMandatory;
       const hasExperience = updatedUser.experience && updatedUser.experience.length > 0;
 
       const hasWorkProfile = updatedUser.workProfile &&
