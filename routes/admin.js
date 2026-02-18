@@ -3,7 +3,7 @@ const router = express.Router();
 const User = require("../models/User");
 const authenticate = require("../middleware/authMiddleware");
 
-const { sendApprovalEmail, sendRejectionEmail } = require("../utils/emailService");
+const { sendApprovalEmail, sendRejectionEmail, sendDeletionEmail } = require("../utils/emailService");
 
 // ✅ Middleware to check admin access
 const verifyAdmin = async (req, res, next) => {
@@ -28,6 +28,16 @@ router.get("/pending-users", authenticate, verifyAdmin, async (req, res) => {
     res.json(pendingUsers);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch pending users" });
+  }
+});
+
+// ✅ 1.5 Get all users (for User Management tab)
+router.get("/all-users", authenticate, verifyAdmin, async (req, res) => {
+  try {
+    const users = await User.find({}).select("-password").sort({ name: 1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch all users" });
   }
 });
 

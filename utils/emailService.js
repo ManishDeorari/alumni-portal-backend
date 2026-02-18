@@ -80,4 +80,16 @@ const sendOTPEmail = async (email, otp) => {
     await sendEmail(email, subject, html);
 };
 
-module.exports = { sendApprovalEmail, sendRejectionEmail, sendOTPEmail };
+const sendDeletionEmail = async (user) => {
+    const subject = "Account Deleted - Alumni Portal";
+    const html = `
+    <h3>Hello ${user.name},</h3>
+    <p>We would like to inform you that your account on the Alumni Portal has been deleted by the administrator.</p>
+    <p>If you have any questions, please reach out to the administration.</p>
+    <br>
+    <p>Best Regards,<br>Alumni Portal Team</p>
+  `;
+    await sendEmail(user.email, subject, html);
+};
+
+module.exports = { sendApprovalEmail, sendRejectionEmail, sendOTPEmail, sendDeletionEmail };
