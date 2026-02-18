@@ -85,6 +85,13 @@ router.put("/read/:otherUserId", checkAuth, async (req, res) => {
             { $set: { read: true } }
         );
 
+        // Notify the sender that their messages were read
+        if (req.io) {
+            req.io.to(otherUserId).emit("messagesRead", {
+                readerId: currentUserId
+            });
+        }
+
         res.json({ message: "Messages marked as read" });
     } catch (err) {
         console.error("Error marking messages as read:", err);
