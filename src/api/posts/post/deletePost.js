@@ -25,7 +25,8 @@ const deletePost = async (req, res) => {
         });
         await adminNote.save();
         if (req.io) {
-          req.io.to(post.user.toString()).emit("newNotification", adminNote);
+          const populatedNotification = await Notification.findById(adminNote._id).populate("sender", "name profilePicture");
+          req.io.to(post.user.toString()).emit("newNotification", populatedNotification);
         }
       } catch (noteErr) {
         console.error("❌ Failed to send admin deletion notice:", noteErr.message);

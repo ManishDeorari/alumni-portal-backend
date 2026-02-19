@@ -45,7 +45,8 @@ const replyToComment = async (req, res) => {
       await newNotification.save();
 
       if (req.io) {
-        req.io.to(comment.user.toString()).emit("newNotification", newNotification);
+        const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+        req.io.to(comment.user.toString()).emit("newNotification", populatedNotification);
       }
     }
 

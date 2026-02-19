@@ -104,7 +104,8 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
             await newNotification.save();
 
             if (req.io) {
-                req.io.to(user._id.toString()).emit("newNotification", newNotification);
+                const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+                req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
             }
         } catch (noteErr) {
             console.error("❌ Failed to send manual award notice:", noteErr.message);

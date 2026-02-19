@@ -83,7 +83,8 @@ module.exports = async (req, res) => {
       await newNotification.save();
 
       if (req.io) {
-        req.io.to(updatedPost.user._id.toString()).emit("newNotification", newNotification);
+        const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+        req.io.to(updatedPost.user._id.toString()).emit("newNotification", populatedNotification);
       }
     }
 

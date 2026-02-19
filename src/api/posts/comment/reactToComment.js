@@ -70,7 +70,8 @@ const reactToComment = async (req, res) => {
       console.log("✅ Notification saved:", newNotification._id);
 
       if (req.io) {
-        req.io.to(commentOwnerId).emit("newNotification", newNotification);
+        const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+        req.io.to(commentOwnerId).emit("newNotification", populatedNotification);
         console.log("📡 WebSocket emitted to room:", commentOwnerId);
       } else {
         console.log("❌ req.io is not available!");

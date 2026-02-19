@@ -78,7 +78,8 @@ module.exports = async (req, res) => {
           });
           await newNotification.save();
           if (req.io) {
-            req.io.to(targetUserId.toString()).emit("newNotification", newNotification);
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+            req.io.to(targetUserId.toString()).emit("newNotification", populatedNotification);
           }
         } catch (noteErr) {
           console.error("❌ Failed to send visit notification:", noteErr.message);
