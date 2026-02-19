@@ -87,15 +87,19 @@ app.use((req, res, next) => {
 
 // ✅ Handle socket events
 io.on("connection", (socket) => {
-  console.log("📡 New socket connection:", socket.id);
+  console.log(`📡 [Socket] New connection: ${socket.id}`);
 
   socket.on("join", (userId) => {
+    if (!userId) {
+      console.warn(`⚠️ [Socket] User tried to join with empty ID (socket: ${socket.id})`);
+      return;
+    }
     socket.join(userId);
-    console.log(`👤 User ${userId} joined their notification room`);
+    console.log(`👤 [Socket] User ${userId} joined their room (socket: ${socket.id})`);
   });
 
-  socket.on("disconnect", () => {
-    console.log("❌ Socket disconnected:", socket.id);
+  socket.on("disconnect", (reason) => {
+    console.log(`❌ [Socket] Disconnected: ${socket.id} (Reason: ${reason})`);
   });
 });
 
