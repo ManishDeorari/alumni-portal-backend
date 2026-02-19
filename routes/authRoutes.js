@@ -63,14 +63,35 @@ router.post("/signup", async (req, res) => {
 // ======================== LOGIN ==========================
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
-    console.log("🔐 Login attempt:", { email });
+    const { email, enrollmentNumber, employeeId, password, identifier } = req.body;
 
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid email or password" });
+    // Support both old format (email/enrollmentNumber) and new format (identifier)
+    let loginQuery = {};
+    if (identifier) {
+      loginQuery = {
+        $or: [
+          { email: identifier },
+          { enrollmentNumber: identifier },
+          { employeeId: identifier }
+        ]
+      };
+    } else if (email) {
+      loginQuery = { email };
+    } else if (enrollmentNumber) {
+      loginQuery = { enrollmentNumber };
+    } else if (employeeId) {
+      loginQuery = { employeeId };
+    } else {
+      return res.status(400).json({ message: "Email or ID is required" });
+    }
+
+    console.log("🔐 Login attempt with query:", loginQuery);
+
+    const user = await User.findOne(loginQuery);
+    if (!user) return res.status(400).json({ message: "Invalid email/ID or password" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid email or password" });
+    if (!isMatch) return res.status(400).json({ message: "Invalid email/ID or password" });
 
     if (!user.approved && user.role !== "admin") {
       return res.status(403).json({ message: "Your account has not been approved by admin yet." });
