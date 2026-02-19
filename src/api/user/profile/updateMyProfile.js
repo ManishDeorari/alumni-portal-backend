@@ -56,12 +56,12 @@ module.exports = async (req, res) => {
       ];
 
       const userEducations = updatedUser.education || [];
-      const hasAllMandatory = MANDATORY_DEGREES.every(degree => {
+      const completedMandatoryCount = MANDATORY_DEGREES.filter(degree => {
         const found = userEducations.find(e => e.degree === degree);
         return found && found.institution && found.startDate && found.endDate;
-      });
+      }).length;
 
-      const hasEducation = hasAllMandatory;
+      const hasEducation = completedMandatoryCount >= 3;
       const hasExperience = updatedUser.experience && updatedUser.experience.length > 0;
 
       const hasWorkProfile = updatedUser.workProfile &&
@@ -72,7 +72,7 @@ module.exports = async (req, res) => {
 
       const isCompleted = hasProfilePic && hasBanner && hasPhone && hasAddress &&
         hasWhatsApp && hasLinkedIn && hasBio && hasEducation &&
-        hasExperience && hasWorkProfile && hasJobPreferences;
+        hasExperience;
 
       if (isCompleted) {
         if (!updatedUser.points) updatedUser.points = { total: 0 };
