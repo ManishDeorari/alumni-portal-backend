@@ -2,6 +2,7 @@ const User = require("../../../models/User");
 const Post = require("../../../models/Post");
 const Group = require("../../../models/Group");
 const GroupMessage = require("../../../models/GroupMessage");
+const Notification = require("../../../models/Notification");
 
 const getUnreadCounts = async (req, res) => {
   try {
@@ -29,9 +30,10 @@ const getUnreadCounts = async (req, res) => {
     });
 
     // 4. Unread Notifications Count
-    const unreadNotificationsCount = user.notifications 
-      ? user.notifications.filter(n => !n.isRead).length 
-      : 0;
+    const unreadNotificationsCount = await Notification.countDocuments({
+      receiver: user._id,
+      isRead: false
+    });
 
     // 5. Admin Signup Requests Count (only for admins)
     let adminSignupRequestsCount = 0;
