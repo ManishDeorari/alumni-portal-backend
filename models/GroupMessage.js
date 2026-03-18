@@ -39,4 +39,7 @@ const groupMessageSchema = new mongoose.Schema({
     },
 });
 
+groupMessageSchema.index({ groupId: 1, createdAt: -1 });
+groupMessageSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model("GroupMessage", groupMessageSchema);

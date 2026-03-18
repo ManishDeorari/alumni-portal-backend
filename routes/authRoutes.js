@@ -50,6 +50,15 @@ router.post("/signup", async (req, res) => {
     });
 
     await newUser.save();
+    
+    // Notify admins of new signup request
+    if (req.io) {
+      req.io.emit("newSignupRequest", { 
+        userId: newUser._id, 
+        name: newUser.name,
+        role: newUser.role 
+      });
+    }
 
     return res.status(201).json({
       message: "Signup successful! Please wait for admin approval.",

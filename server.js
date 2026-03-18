@@ -27,6 +27,7 @@ const pointsSystemRoutes = require("./routes/admin/pointsSystemRoutes");
 // ✅ NEW: Admin Dashboard routes
 const adminRoutes = require("./routes/admin");
 const notificationRoutes = require("./routes/notificationRoutes");
+const countRoutes = require("./routes/countRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -146,6 +147,7 @@ app.use("/api/admin", rolloverConfigRoute);
 app.use("/api/admin-points-mgmt", pointsSystemRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/groups", require("./routes/groupRoutes")); // ✅ Group Routes
+app.use("/api/counts", countRoutes);
 
 // ✅ Global Error Handler
 app.use((err, req, res, next) => {

@@ -55,6 +55,7 @@ const postSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 postSchema.index({ user: 1, createdAt: -1 });
+postSchema.index({ createdAt: -1 });
 
 const emojiRegex = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Extended_Pictographic})$/u;
 

@@ -155,6 +155,12 @@ const UserSchema = new mongoose.Schema(
       },
     ],
 
+    // Last Seen Tracking (for notification indicators)
+    lastSeenPostsAt: { type: Date, default: Date.now, index: true },
+    lastSeenGroupsAt: { type: Date, default: Date.now, index: true },
+    lastSeenNetworkAt: { type: Date, default: Date.now, index: true },
+    lastSeenAdminRequestsAt: { type: Date, default: Date.now, index: true },
+
     // Reset Password OTP
     resetPasswordOTP: { type: String },
     resetPasswordExpires: { type: Date },
