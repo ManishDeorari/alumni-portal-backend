@@ -1,0 +1,40 @@
+const mongoose = require("mongoose");
+
+const groupSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    description: {
+        type: String,
+        trim: true,
+    },
+    profileImage: {
+        type: String,
+        default: "/default-group.jpg",
+    },
+    members: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+    }],
+    admin: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+    },
+    allowFacultyMessaging: {
+        type: Boolean,
+        default: false,
+    },
+    isAllMemberGroup: {
+        type: Boolean,
+        default: false,
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now,
+    },
+});
+
+module.exports = mongoose.model("Group", groupSchema);

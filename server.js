@@ -98,6 +98,18 @@ io.on("connection", (socket) => {
     console.log(`👤 [Socket] User ${userId} joined their room (socket: ${socket.id})`);
   });
 
+  socket.on("joinGroup", (groupId) => {
+    if (!groupId) return;
+    socket.join(`group_${groupId}`);
+    console.log(`👥 [Socket] User joined group room group_${groupId} (socket: ${socket.id})`);
+  });
+
+  socket.on("leaveGroup", (groupId) => {
+    if (!groupId) return;
+    socket.leave(`group_${groupId}`);
+    console.log(`👥 [Socket] User left group room group_${groupId} (socket: ${socket.id})`);
+  });
+
   socket.on("disconnect", (reason) => {
     console.log(`❌ [Socket] Disconnected: ${socket.id} (Reason: ${reason})`);
   });
@@ -133,7 +145,7 @@ app.use("/api/admin", yearRolloverRoute);
 app.use("/api/admin", rolloverConfigRoute);
 app.use("/api/admin-points-mgmt", pointsSystemRoutes);
 app.use("/api/notifications", notificationRoutes);
-app.use("/api/messages", require("./routes/messageRoutes")); // ✅ Message Routes
+app.use("/api/groups", require("./routes/groupRoutes")); // ✅ Group Routes
 
 // ✅ Global Error Handler
 app.use((err, req, res, next) => {
