@@ -57,6 +57,9 @@ module.exports = async (req, res) => {
               }
             }
           );
+          
+          // 🔔 Send Notification for recurring visit (new day)
+          await sendVisitNotification(req, visitorId, targetUserId);
         }
       } else {
         // First time visitor ever
@@ -66,24 +69,8 @@ module.exports = async (req, res) => {
 
         await user.save();
 
-        // 🔔 Send Notification
-        try {
-          const Notification = require("../../../../models/Notification");
-          const visitor = await User.findById(visitorId).select("name");
-          const newNotification = new Notification({
-            sender: visitorId,
-            receiver: targetUserId,
-            type: "profile_visit",
-            message: `visited your profile.`,
-          });
-          await newNotification.save();
-          if (req.io) {
-            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-            req.io.to(targetUserId.toString()).emit("newNotification", populatedNotification);
-          }
-        } catch (noteErr) {
-          console.error("❌ Failed to send visit notification:", noteErr.message);
-        }
+        // 🔔 Send Notification for first time visit
+        await sendVisitNotification(req, visitorId, targetUserId);
       }
     }
 
@@ -95,3 +82,33 @@ module.exports = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// Helper function to send visit notification
+async function sendVisitNotification(req, visitorId, targetUserId) {
+  try {
+    const Notification = require("../../../../models/Notification");
+    const User = require("../../../../models/User");
+    
+    // Check if we already sent a notification recently (optional, but good for spam)
+    // For now, we trust the "updated/new day" logic that calls this.
+    
+    const newNotification = new Notification({
+      sender: visitorId,
+      receiver: targetUserId,
+      type: "profile_visit",
+      message: `visited your profile.`,
+    });
+    
+    await newNotification.save();
+    
+    if (req.io) {
+      const populatedNotification = await Notification.findById(newNotification._id)
+        .populate("sender", "name profilePicture");
+      
+      console.log(`📡 [Socket] Emitting visit notification to user ${targetUserId}`);
+      req.io.to(targetUserId.toString()).emit("newNotification", populatedNotification);
+    }
+  } catch (err) {
+    console.error("❌ Failed to send visit notification:", err.message);
+  }
+}
