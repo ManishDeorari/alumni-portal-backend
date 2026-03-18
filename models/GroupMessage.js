@@ -13,7 +13,18 @@ const groupMessageSchema = new mongoose.Schema({
     },
     content: {
         type: String,
-        required: true,
+        default: "",
+    },
+    mediaUrl: {
+        type: String,
+    },
+    mediaPublicId: {
+        type: String,
+    },
+    type: {
+        type: String,
+        enum: ["text", "image"],
+        default: "text",
     },
     reactions: [{
         emoji: String,

@@ -4,6 +4,7 @@ const checkAuth = require("../middleware/authMiddleware");
 const Group = require("../models/Group");
 const GroupMessage = require("../models/GroupMessage");
 const User = require("../models/User");
+const cloudinary = require("../config/cloudinary");
 
 // Middleware to check if user is admin
 const checkAdmin = (req, res, next) => {
@@ -18,7 +19,7 @@ const checkAdmin = (req, res, next) => {
 // @desc    Create a new group (Admin only)
 router.post("/", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { name, description, profileImage, isAllMemberGroup } = req.body;
+        const { name, description, profileImage, profileImagePublicId, isAllMemberGroup } = req.body;
         
         let members = req.body.members || [];
         if (isAllMemberGroup) {
@@ -32,6 +33,7 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
             name,
             description,
             profileImage: profileImage || "/default-group.jpg",
+            profileImagePublicId,
             members,
             admin: req.user.id,
             isAllMemberGroup: !!isAllMemberGroup
@@ -63,6 +65,28 @@ router.get("/", checkAuth, async (req, res) => {
     }
 });
 
+// @route   GET /api/groups/:groupId
+// @desc    Get single group details
+router.get("/:groupId", checkAuth, async (req, res) => {
+    try {
+        const group = await Group.findById(req.params.groupId)
+            .populate("members", "name profilePicture role enrollmentNumber")
+            .populate("admin", "name profilePicture");
+        
+        if (!group) return res.status(404).json({ message: "Group not found" });
+
+        const isAdmin = req.user.isAdmin || req.user.role === "admin";
+        if (!isAdmin && !group.members.some(m => m._id.toString() === req.user.id)) {
+            return res.status(403).json({ message: "Not a member of this group" });
+        }
+
+        res.json(group);
+    } catch (err) {
+        console.error("Error fetching group:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
 // @route   GET /api/groups/:groupId/messages
 // @desc    Get messages for a group
 router.get("/:groupId/messages", checkAuth, async (req, res) => {
@@ -90,10 +114,10 @@ router.get("/:groupId/messages", checkAuth, async (req, res) => {
 });
 
 // @route   POST /api/groups/send
-// @desc    Send a message to a group
+// @desc    Send a message to a group (Text or Image)
 router.post("/send", checkAuth, async (req, res) => {
     try {
-        const { groupId, content } = req.body;
+        const { groupId, content, mediaUrl, mediaPublicId, type } = req.body;
         const senderId = req.user.id;
         const userRole = req.user.role;
 
@@ -115,7 +139,10 @@ router.post("/send", checkAuth, async (req, res) => {
         const newMessage = new GroupMessage({
             groupId,
             sender: senderId,
-            content
+            content: content || "",
+            mediaUrl,
+            mediaPublicId,
+            type: type || "text"
         });
 
         await newMessage.save();
@@ -139,10 +166,15 @@ router.post("/send", checkAuth, async (req, res) => {
 // @desc    Update group settings (Admin only)
 router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { allowFacultyMessaging, description, name } = req.body;
+        const { allowFacultyMessaging, description, name, profileImage, profileImagePublicId } = req.body;
+        
+        const updateData = { allowFacultyMessaging, description, name };
+        if (profileImage) updateData.profileImage = profileImage;
+        if (profileImagePublicId) updateData.profileImagePublicId = profileImagePublicId;
+
         const group = await Group.findByIdAndUpdate(
             req.params.groupId,
-            { $set: { allowFacultyMessaging, description, name } },
+            { $set: updateData },
             { new: true }
         );
         res.json(group);
@@ -176,6 +208,55 @@ router.post("/:groupId/invite", checkAuth, checkAdmin, async (req, res) => {
         res.json({ message: "Members added successfully", group });
     } catch (err) {
         console.error("Error inviting members:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// @route   DELETE /api/groups/:groupId/members/:memberId
+// @desc    Remove a member from group (Admin only)
+router.delete("/:groupId/members/:memberId", checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { groupId, memberId } = req.params;
+        const group = await Group.findById(groupId);
+        if (!group) return res.status(404).json({ message: "Group not found" });
+
+        group.members = group.members.filter(m => m.toString() !== memberId);
+        await group.save();
+
+        res.json({ message: "Member removed", group });
+    } catch (err) {
+        console.error("Error removing member:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// @route   DELETE /api/groups/:groupId/messages/:messageId
+// @desc    Delete a message/media (Admin only or Sender)
+router.delete("/:groupId/messages/:messageId", checkAuth, async (req, res) => {
+    try {
+        const { messageId } = req.params;
+        const message = await GroupMessage.findById(messageId);
+        if (!message) return res.status(404).json({ message: "Message not found" });
+
+        const isAdmin = req.user.isAdmin || req.user.role === "admin";
+        if (!isAdmin && message.sender.toString() !== req.user.id) {
+            return res.status(403).json({ message: "Unauthorized" });
+        }
+
+        // If it has media, delete from Cloudinary
+        if (message.mediaPublicId) {
+            await cloudinary.uploader.destroy(message.mediaPublicId);
+        }
+
+        await GroupMessage.findByIdAndDelete(messageId);
+        
+        if (req.io) {
+            req.io.to(`group_${req.params.groupId}`).emit("messageDeleted", messageId);
+        }
+
+        res.json({ message: "Message deleted" });
+    } catch (err) {
+        console.error("Error deleting message:", err);
         res.status(500).json({ message: "Server error" });
     }
 });

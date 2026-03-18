@@ -14,6 +14,9 @@ const groupSchema = new mongoose.Schema({
         type: String,
         default: "/default-group.jpg",
     },
+    profileImagePublicId: {
+        type: String,
+    },
     members: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
