@@ -14,19 +14,48 @@ router.get("/", authMiddleware, async (req, res) => {
 
     const filter = { _id: { $ne: currentUserId }, approved: true };
 
+    const conditions = [];
+
     if (query) {
       const regex = new RegExp(query, "i");
-      filter.$or = [
-        { name: regex },
-        { email: regex },
-        { enrollmentNumber: regex },
-        { employeeId: regex }, // Also search by Employee ID
-        { course: regex }
-      ];
+      conditions.push({
+        $or: [
+          { name: regex },
+          { email: regex },
+          { enrollmentNumber: regex },
+          { employeeId: regex },
+          { course: regex }
+        ]
+      });
     }
 
-    if (course) filter.course = course;
-    if (year) filter.year = year;
+    if (course && year) {
+      conditions.push({
+        $or: [
+          { "education.courseYearKey": `${String(course).toUpperCase()}_${year}` },
+          { course: new RegExp(`^${course}$`, "i"), year: String(year) }
+        ]
+      });
+    } else if (course) {
+      conditions.push({
+        $or: [
+          { "education.degree": String(course).toUpperCase() },
+          { course: new RegExp(`^${course}$`, "i") }
+        ]
+      });
+    } else if (year) {
+      conditions.push({
+        $or: [
+          { "education.startYear": Number(year) },
+          { year: String(year) }
+        ]
+      });
+    }
+
+    if (conditions.length > 0) {
+      filter.$and = conditions;
+    }
+
     if (industry) filter["workProfile.industry"] = { $regex: new RegExp(industry, "i") };
 
     if (skills) {

@@ -31,6 +31,36 @@ module.exports = async (req, res) => {
       updates.profilePicture = profileImage;
     }
 
+    // ✅ Format education entries
+    if (updates.education && Array.isArray(updates.education)) {
+      updates.education = updates.education.map((edu) => {
+        let startYear = null;
+        let endYear = null;
+
+        if (edu.startYear) startYear = Number(edu.startYear);
+        else if (edu.startDate) startYear = Number(edu.startDate.split(" ").pop());
+
+        if (edu.endYear) endYear = Number(edu.endYear);
+        else if (edu.endDate) endYear = Number(edu.endDate.split(" ").pop());
+
+        const formattedDegree = edu.degree ? String(edu.degree).toUpperCase() : "";
+        let courseYearKey = null;
+        
+        if (formattedDegree && startYear && !isNaN(startYear)) {
+          // e.g. MCA_2023
+          courseYearKey = `${formattedDegree}_${startYear}`.toUpperCase();
+        }
+
+        return {
+          ...edu,
+          degree: formattedDegree || edu.degree,
+          startYear: isNaN(startYear) ? null : startYear,
+          endYear: isNaN(endYear) ? null : endYear,
+          courseYearKey
+        };
+      });
+    }
+
     const updatedUser = await User.findByIdAndUpdate(req.user.id, updates, {
       new: true,
     }).select("-password");
