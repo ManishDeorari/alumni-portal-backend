@@ -96,9 +96,20 @@ async function sendVisitNotification(req, visitorId, targetUserId) {
     const Notification = require("../../../../models/Notification");
     const User = require("../../../../models/User");
     
-    // Check if we already sent a notification recently (optional, but good for spam)
-    // For now, we trust the "updated/new day" logic that calls this.
-    
+    // 🛑 Duplicate Prevention: Check if a notification was sent in the last 1 minute
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+    const existingNotification = await Notification.findOne({
+      sender: visitorId,
+      receiver: targetUserId,
+      type: "profile_visit",
+      createdAt: { $gte: oneMinuteAgo }
+    });
+
+    if (existingNotification) {
+      console.log(`⏭️ [Duplication Guard] Skipping redundant notification from ${visitorId} to ${targetUserId}`);
+      return;
+    }
+
     const newNotification = new Notification({
       sender: visitorId,
       receiver: targetUserId,
