@@ -12,8 +12,15 @@ module.exports = async (req, res) => {
     // 🚀 Visit Tracking Logic
     if (visitorId && visitorId.toString() !== targetUserId.toString()) {
       const now = new Date();
-      const todayStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
-      const yearStr = now.getFullYear().toString();   // YYYY
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      const isDifferentDay = !user.visitStats.lastResetTodayVisitsAt || 
+                             new Date(user.visitStats.lastResetTodayVisitsAt) < today;
+
+      if (isDifferentDay) {
+        user.visitStats.todayVisits = 0;
+        user.visitStats.lastResetTodayVisitsAt = now;
+      }
 
       // Ensure visitStats exists
       if (!user.visitStats) {
@@ -53,13 +60,11 @@ module.exports = async (req, res) => {
               $set: {
                 "visitors.$.lastVisit": now,
                 "visitStats.todayVisits": user.visitStats.todayVisits,
-                "visitStats.totalVisits": user.visitStats.totalVisits
+                "visitStats.totalVisits": user.visitStats.totalVisits,
+                "visitStats.lastResetTodayVisitsAt": user.visitStats.lastResetTodayVisitsAt
               }
             }
           );
-          
-          // 🔔 Send Notification for recurring visit (new day)
-          await sendVisitNotification(req, visitorId, targetUserId);
         }
       } else {
         // First time visitor ever
@@ -68,10 +73,10 @@ module.exports = async (req, res) => {
         user.visitors.push({ user: visitorId, lastVisit: now });
 
         await user.save();
-
-        // 🔔 Send Notification for first time visit
-        await sendVisitNotification(req, visitorId, targetUserId);
       }
+
+      // 🔔 Send Notification for EVERY visit (as requested)
+      await sendVisitNotification(req, visitorId, targetUserId);
     }
 
     // ✅ Return the complete user object (already excluded password in select)
@@ -102,11 +107,15 @@ async function sendVisitNotification(req, visitorId, targetUserId) {
     await newNotification.save();
     
     if (req.io) {
+      console.log(`📡 [Socket] Attempting to emit notification to ${targetUserId}`);
       const populatedNotification = await Notification.findById(newNotification._id)
         .populate("sender", "name profilePicture");
       
-      console.log(`📡 [Socket] Emitting visit notification to user ${targetUserId}`);
-      req.io.to(targetUserId.toString()).emit("newNotification", populatedNotification);
+      const room = targetUserId.toString();
+      req.io.to(room).emit("newNotification", populatedNotification);
+      console.log(`✅ [Socket] Emitted 'newNotification' to room: ${room}`);
+    } else {
+      console.warn("⚠️ [Socket] req.io not found in visit notification");
     }
   } catch (err) {
     console.error("❌ Failed to send visit notification:", err.message);

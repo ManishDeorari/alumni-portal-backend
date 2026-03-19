@@ -147,6 +147,7 @@ const UserSchema = new mongoose.Schema(
     visitStats: {
       totalVisits: { type: Number, default: 0 },
       todayVisits: { type: Number, default: 0 },
+      lastResetTodayVisitsAt: { type: Date, default: Date.now }
     },
     visitors: [
       {
