@@ -13,6 +13,8 @@ module.exports = async (req, res) => {
     if (visitorId && visitorId.toString() !== targetUserId.toString()) {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayStr = now.toISOString().split("T")[0];
+      const yearStr = now.getFullYear().toString();
 
       const isDifferentDay = !user.visitStats.lastResetTodayVisitsAt || 
                              new Date(user.visitStats.lastResetTodayVisitsAt) < today;
