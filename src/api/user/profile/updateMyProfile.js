@@ -43,17 +43,18 @@ module.exports = async (req, res) => {
         if (edu.endYear) endYear = Number(edu.endYear);
         else if (edu.endDate) endYear = Number(edu.endDate.split(" ").pop());
 
-        const formattedDegree = edu.degree ? String(edu.degree).toUpperCase() : "";
+        const formattedCourse = edu.course ? String(edu.course).toUpperCase() : "";
         let courseYearKey = null;
         
-        if (formattedDegree && startYear && !isNaN(startYear)) {
+        if (formattedCourse && startYear && !isNaN(startYear)) {
           // e.g. MCA_2023
-          courseYearKey = `${formattedDegree}_${startYear}`.toUpperCase();
+          courseYearKey = `${formattedCourse}_${startYear}`.toUpperCase();
         }
 
         return {
           ...edu,
-          degree: formattedDegree || edu.degree,
+          degree: edu.degree,
+          course: formattedCourse || edu.course,
           startYear: isNaN(startYear) ? null : startYear,
           endYear: isNaN(endYear) ? null : endYear,
           courseYearKey
@@ -87,7 +88,7 @@ module.exports = async (req, res) => {
 
       const userEducations = updatedUser.education || [];
       const completedMandatoryCount = MANDATORY_DEGREES.filter(degree => {
-        const found = userEducations.find(e => e.degree === degree);
+        const found = userEducations.find(e => e.level === degree || e.degree === degree);
         return found && found.institution && found.startDate && found.endDate;
       }).length;
 

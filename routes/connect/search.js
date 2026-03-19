@@ -39,7 +39,7 @@ router.get("/", authMiddleware, async (req, res) => {
     } else if (course) {
       conditions.push({
         $or: [
-          { "education.degree": String(course).toUpperCase() },
+          { "education.course": String(course).toUpperCase() },
           { course: new RegExp(`^${course}$`, "i") }
         ]
       });
