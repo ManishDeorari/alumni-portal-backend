@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
 const Post = require("../models/Post");
+const Group = require("../models/Group");
 const cloudinary = require("../config/cloudinary");
 const authenticate = require("../middleware/authMiddleware");
 
@@ -77,6 +78,12 @@ router.put("/make-admin/:id", authenticate, verifyAdmin, async (req, res) => {
     user.role = "admin";
     user.approved = true; // auto approve on promotion
     await user.save();
+
+    // 🌟 Auto-add new admin to all groups
+    await Group.updateMany(
+      { members: { $ne: user._id } },
+      { $push: { members: user._id } }
+    );
 
     res.json({ message: `${user.name} is now an Admin!` });
   } catch (error) {
