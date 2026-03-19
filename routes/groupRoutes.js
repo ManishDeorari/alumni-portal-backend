@@ -70,7 +70,7 @@ router.get("/", checkAuth, async (req, res) => {
 router.get("/:groupId", checkAuth, async (req, res) => {
     try {
         const group = await Group.findById(req.params.groupId)
-            .populate("members", "name profilePicture role enrollmentNumber")
+            .populate("members", "name profilePicture role enrollmentNumber employeeId")
             .populate("admin", "name profilePicture");
         
         if (!group) return res.status(404).json({ message: "Group not found" });
@@ -104,7 +104,7 @@ router.get("/:groupId/messages", checkAuth, async (req, res) => {
 
         const messages = await GroupMessage.find({ groupId })
             .sort({ createdAt: 1 })
-            .populate("sender", "name profilePicture role");
+            .populate("sender", "name profilePicture role employeeId");
 
         res.json(messages);
     } catch (err) {
