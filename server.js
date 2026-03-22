@@ -148,6 +148,8 @@ app.use("/api/admin-points-mgmt", pointsSystemRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/groups", require("./routes/groupRoutes")); // ✅ Group Routes
 app.use("/api/counts", countRoutes);
+app.use("/api/events", require("./routes/eventRoutes"));
+app.use("/api/registrations", require("./routes/registrationRoutes"));
 
 // ✅ Global Error Handler
 app.use((err, req, res, next) => {
