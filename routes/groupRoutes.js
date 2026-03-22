@@ -38,7 +38,8 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
             name,
             description,
             profileImage: profileImage || "/default-group.jpg",
-            profileImagePublicId,
+            profileImagePublicId: profileImagePublicId || null,
+            profileImageSettings: profileImageSettings || { x: 0, y: 0, zoom: 1, width: 100, height: 100 },
             members,
             admin: req.user.id,
             isAllMemberGroup: !!isAllMemberGroup
@@ -171,7 +172,7 @@ router.post("/send", checkAuth, async (req, res) => {
 // @desc    Update group settings (Admin only)
 router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { allowFacultyMessaging, description, name, profileImage, profileImagePublicId, oldImageUrl } = req.body;
+        const { allowFacultyMessaging, description, name, profileImage, profileImagePublicId, profileImageSettings, oldImageUrl } = req.body;
         
         // 🧹 Cloudinary cleanup for old image if being replaced
         if (oldImageUrl && oldImageUrl.includes("res.cloudinary.com") && !oldImageUrl.includes("default-group.jpg")) {
@@ -191,6 +192,7 @@ router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
         const updateData = { allowFacultyMessaging, description, name };
         if (profileImage !== undefined) updateData.profileImage = profileImage || "/default-group.jpg";
         if (profileImagePublicId !== undefined) updateData.profileImagePublicId = profileImagePublicId;
+        if (profileImageSettings !== undefined) updateData.profileImageSettings = profileImageSettings;
 
         await Group.findByIdAndUpdate(
             req.params.groupId,
@@ -362,6 +364,7 @@ router.delete("/:groupId/image", checkAuth, checkAdmin, async (req, res) => {
 
         group.profileImage = "/default-group.jpg";
         group.profileImagePublicId = null;
+        group.profileImageSettings = { x: 0, y: 0, zoom: 1, width: 100, height: 100 };
         await group.save();
 
         const updatedGroup = await Group.findById(req.params.groupId)

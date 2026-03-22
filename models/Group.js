@@ -34,6 +34,13 @@ const groupSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    profileImageSettings: {
+        x: { type: Number, default: 0 },
+        y: { type: Number, default: 0 },
+        zoom: { type: Number, default: 1 },
+        width: { type: Number, default: 100 },
+        height: { type: Number, default: 100 }
+    },
     createdAt: {
         type: Date,
         default: Date.now,
