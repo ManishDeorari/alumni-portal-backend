@@ -192,6 +192,11 @@ router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
         if (profileImage !== undefined) updateData.profileImage = profileImage || "/default-group.jpg";
         if (profileImagePublicId !== undefined) updateData.profileImagePublicId = profileImagePublicId;
 
+        await Group.findByIdAndUpdate(
+            req.params.groupId,
+            { $set: updateData }
+        );
+
         const updatedGroup = await Group.findById(req.params.groupId)
             .populate("members", "name profilePicture role enrollmentNumber employeeId")
             .populate("admin", "name profilePicture");
