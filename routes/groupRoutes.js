@@ -20,7 +20,7 @@ const checkAdmin = (req, res, next) => {
 // @desc    Create a new group (Admin only)
 router.post("/", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { name, description, profileImage, profileImagePublicId, profileImageSettings, isAllAlumniGroup, isAllFacultyGroup } = req.body;
+        const { name, description, profileImage, profileImagePublicId, profileImageSettings } = req.body;
         
         // 🛑 Check for unique name
         const existingGroup = await Group.findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
@@ -30,16 +30,6 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
         
         // 👥 Calculate Members
         let members = req.body.members || [];
-        
-        // 🔄 Automatic Role Inclusion
-        if (isAllAlumniGroup || isAllFacultyGroup) {
-            const roleQuery = [];
-            if (isAllAlumniGroup) roleQuery.push("alumni");
-            if (isAllFacultyGroup) roleQuery.push("faculty");
-            
-            const targetedUsers = await User.find({ role: { $in: roleQuery } }, "_id");
-            members = [...new Set([...members, ...targetedUsers.map(u => String(u._id))])];
-        }
 
         // ✅ Always Auto-add all admins and main admin
         const admins = await User.find({ $or: [{ role: "admin" }, { isAdmin: true }, { isMainAdmin: true }] }, "_id");
