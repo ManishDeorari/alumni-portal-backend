@@ -47,32 +47,39 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
         });
 
         await newGroup.save();
-        console.log(`✅ Group "${newGroup.name}" saved. Notifying ${members.length} members...`);
-
-        // 🔔 Notify members about joining the group
-        const notificationPromises = members.map(async (memberId) => {
+        // 🔔 Notify members in background for speed
+        setImmediate(async () => {
             try {
-                const notification = new Notification({
+                const senderInfo = { 
+                    _id: req.user.id, 
+                    name: req.user.name, 
+                    profilePicture: req.user.profilePicture 
+                };
+
+                const notifications = members.map(memberId => ({
                     sender: req.user.id,
                     receiver: memberId,
                     type: "group_joined",
                     message: `You have joined group "${newGroup.name}"`,
                     groupId: newGroup._id
-                });
-                const savedNote = await notification.save();
-                const populatedNote = await savedNote.populate("sender", "name profilePicture");
-                const notificationObj = populatedNote.toObject();
-                console.log(`🔔 Notification saved for member ${memberId}: ${savedNote._id}`);
-                
+                }));
+
+                await Notification.insertMany(notifications);
+
                 if (req.io) {
-                    req.io.to(memberId.toString()).emit("newNotification", notificationObj);
-                    console.log(`📡 Socket emitted to ${memberId}`);
+                    notifications.forEach(note => {
+                        req.io.to(note.receiver.toString()).emit("newNotification", {
+                            ...note,
+                            sender: senderInfo,
+                            createdAt: new Date(),
+                            isRead: false
+                        });
+                    });
                 }
-            } catch (noteErr) {
-                console.error(`❌ Failed to notify member ${memberId}:`, noteErr.message);
+            } catch (err) {
+                console.error("❌ Background notification error:", err);
             }
         });
-        await Promise.all(notificationPromises);
 
         res.status(201).json(newGroup);
     } catch (err) {
@@ -261,32 +268,42 @@ router.post("/:groupId/invite", checkAuth, checkAdmin, async (req, res) => {
         
         group.members = updatedMembers;
         await group.save();
-        console.log(`✅ Group "${group.name}" updated. Notifying ${newMemberIds.length} new members...`);
 
-        // 🔔 Notify new members
-        const notificationPromises = newMemberIds.map(async (memberId) => {
+        // 🔔 Notify members in background for speed
+        setImmediate(async () => {
             try {
-                const notification = new Notification({
+                if (newMemberIds.length === 0) return;
+
+                const senderInfo = { 
+                    _id: req.user.id, 
+                    name: req.user.name, 
+                    profilePicture: req.user.profilePicture 
+                };
+
+                const notifications = newMemberIds.map(memberId => ({
                     sender: req.user.id,
                     receiver: memberId,
                     type: "group_added",
                     message: `You have been added to group "${group.name}"`,
                     groupId: group._id
-                });
-                const savedNote = await notification.save();
-                const populatedNote = await savedNote.populate("sender", "name profilePicture");
-                const notificationObj = populatedNote.toObject();
-                console.log(`🔔 Notification saved for invited member ${memberId}: ${savedNote._id}`);
-                
+                }));
+
+                await Notification.insertMany(notifications);
+
                 if (req.io) {
-                    req.io.to(memberId.toString()).emit("newNotification", notificationObj);
-                    console.log(`📡 Socket emitted to ${memberId}`);
+                    notifications.forEach(note => {
+                        req.io.to(note.receiver.toString()).emit("newNotification", {
+                            ...note,
+                            sender: senderInfo,
+                            createdAt: new Date(),
+                            isRead: false
+                        });
+                    });
                 }
-            } catch (noteErr) {
-                console.error(`❌ Failed to notify invited member ${memberId}:`, noteErr.message);
+            } catch (err) {
+                console.error("❌ Background invitation notification error:", err);
             }
         });
-        await Promise.all(notificationPromises);
 
         const updatedGroup = await Group.findById(req.params.groupId)
             .populate("members", "name profilePicture role enrollmentNumber employeeId")
@@ -310,20 +327,29 @@ router.delete("/:groupId/members/:memberId", checkAuth, checkAdmin, async (req, 
         group.members = group.members.filter(m => m.toString() !== memberId);
         await group.save();
 
-        // 🔔 Notify removed member
-        const notification = new Notification({
-            sender: req.user.id,
-            receiver: memberId,
-            type: "group_removed",
-            message: `You have been removed from group "${group.name}"`,
-            groupId: group._id
+        // 🔔 Notify in background for speed
+        setImmediate(async () => {
+            try {
+                const notification = new Notification({
+                    sender: req.user.id,
+                    receiver: memberId,
+                    type: "group_removed",
+                    message: `You have been removed from group "${group.name}"`,
+                    groupId: group._id
+                });
+                await notification.save();
+                if (req.io) {
+                    req.io.to(memberId.toString()).emit("newNotification", {
+                        ...notification.toObject(),
+                        sender: { _id: req.user.id, name: req.user.name, profilePicture: req.user.profilePicture },
+                        createdAt: new Date(),
+                        isRead: false
+                    });
+                }
+            } catch (err) {
+                console.error("❌ Background removal notification error:", err);
+            }
         });
-        const savedNote = await notification.save();
-        const populatedNote = await savedNote.populate("sender", "name profilePicture");
-        const notificationObj = populatedNote.toObject();
-        if (req.io) {
-            req.io.to(memberId.toString()).emit("newNotification", notificationObj);
-        }
 
         const updatedGroup = await Group.findById(groupId)
             .populate("members", "name profilePicture role enrollmentNumber employeeId")
@@ -473,26 +499,41 @@ router.delete("/:groupId", checkAuth, checkAdmin, async (req, res) => {
         const memberIds = group.members || [];
         const groupName = group.name;
 
-        const notificationPromises = memberIds.map(async (memberId) => {
+        // 🔔 Background Batch Notification for speed
+        setImmediate(async () => {
             try {
-                const notification = new Notification({
+                if (memberIds.length === 0) return;
+
+                const senderInfo = { 
+                    _id: req.user.id, 
+                    name: req.user.name, 
+                    profilePicture: req.user.profilePicture 
+                };
+
+                const notifications = memberIds.map(memberId => ({
                     sender: req.user.id,
                     receiver: memberId,
                     type: "group_disbanded",
                     message: `The Group "${groupName}" is disbanded`,
                     groupId: group._id
-                });
-                const savedNote = await notification.save();
-                const populatedNote = await savedNote.populate("sender", "name profilePicture");
-                const notificationObj = populatedNote.toObject();
+                }));
+
+                await Notification.insertMany(notifications);
+
                 if (req.io) {
-                    req.io.to(memberId.toString()).emit("newNotification", notificationObj);
+                    notifications.forEach(note => {
+                        req.io.to(note.receiver.toString()).emit("newNotification", {
+                            ...note,
+                            sender: senderInfo,
+                            createdAt: new Date(),
+                            isRead: false
+                        });
+                    });
                 }
-            } catch (noteErr) {
-                console.error(`❌ Failed to notify disbanded member ${memberId}:`, noteErr.message);
+            } catch (err) {
+                console.error("❌ Background disband notification error:", err);
             }
         });
-        await Promise.all(notificationPromises);
 
         // Delete group messages
         await GroupMessage.deleteMany({ groupId: req.params.groupId });
