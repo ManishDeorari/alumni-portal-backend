@@ -22,6 +22,12 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
     try {
         const { name, description, profileImage, profileImagePublicId, profileImageSettings, isAllMemberGroup } = req.body;
         
+        // 🛑 Check for unique name
+        const existingGroup = await Group.findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
+        if (existingGroup) {
+            return res.status(400).json({ message: "A group with this name already exists. Please choose a unique name." });
+        }
+        
         let members = req.body.members || [];
         if (isAllMemberGroup) {
             const allUsers = await User.find({}, "_id");
@@ -208,6 +214,17 @@ router.post("/send", checkAuth, async (req, res) => {
 router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
     try {
         const { allowFacultyMessaging, description, name, profileImage, profileImagePublicId, profileImageSettings, oldImageUrl } = req.body;
+        
+        // 🛑 Check for unique name if it's being changed
+        if (name) {
+            const existingGroup = await Group.findOne({ 
+                name: { $regex: new RegExp(`^${name}$`, "i") },
+                _id: { $ne: req.params.groupId } 
+            });
+            if (existingGroup) {
+                return res.status(400).json({ message: "A group with this name already exists. Please choose a unique name." });
+            }
+        }
         
         // 🧹 Cloudinary cleanup for old image if being replaced
         if (oldImageUrl && oldImageUrl.includes("res.cloudinary.com") && !oldImageUrl.includes("default-group.jpg")) {
