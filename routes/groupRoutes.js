@@ -47,20 +47,29 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
         });
 
         await newGroup.save();
+        console.log(`✅ Group "${newGroup.name}" saved. Notifying ${members.length} members...`);
 
         // 🔔 Notify members about joining the group
         const notificationPromises = members.map(async (memberId) => {
-            const notification = new Notification({
-                sender: req.user.id,
-                receiver: memberId,
-                type: "group_joined",
-                message: `You have joined group "${newGroup.name}"`,
-                groupId: newGroup._id
-            });
-            const savedNote = await notification.save();
-            const populatedNote = await savedNote.populate("sender", "name profilePicture");
-            if (req.io) {
-                req.io.to(memberId.toString()).emit("newNotification", populatedNote);
+            try {
+                const notification = new Notification({
+                    sender: req.user.id,
+                    receiver: memberId,
+                    type: "group_joined",
+                    message: `You have joined group "${newGroup.name}"`,
+                    groupId: newGroup._id
+                });
+                const savedNote = await notification.save();
+                const populatedNote = await savedNote.populate("sender", "name profilePicture");
+                const notificationObj = populatedNote.toObject();
+                console.log(`🔔 Notification saved for member ${memberId}: ${savedNote._id}`);
+                
+                if (req.io) {
+                    req.io.to(memberId.toString()).emit("newNotification", notificationObj);
+                    console.log(`📡 Socket emitted to ${memberId}`);
+                }
+            } catch (noteErr) {
+                console.error(`❌ Failed to notify member ${memberId}:`, noteErr.message);
             }
         });
         await Promise.all(notificationPromises);
@@ -252,20 +261,29 @@ router.post("/:groupId/invite", checkAuth, checkAdmin, async (req, res) => {
         
         group.members = updatedMembers;
         await group.save();
+        console.log(`✅ Group "${group.name}" updated. Notifying ${newMemberIds.length} new members...`);
 
         // 🔔 Notify new members
         const notificationPromises = newMemberIds.map(async (memberId) => {
-            const notification = new Notification({
-                sender: req.user.id,
-                receiver: memberId,
-                type: "group_added",
-                message: `You have been added to group "${group.name}"`,
-                groupId: group._id
-            });
-            const savedNote = await notification.save();
-            const populatedNote = await savedNote.populate("sender", "name profilePicture");
-            if (req.io) {
-                req.io.to(memberId.toString()).emit("newNotification", populatedNote);
+            try {
+                const notification = new Notification({
+                    sender: req.user.id,
+                    receiver: memberId,
+                    type: "group_added",
+                    message: `You have been added to group "${group.name}"`,
+                    groupId: group._id
+                });
+                const savedNote = await notification.save();
+                const populatedNote = await savedNote.populate("sender", "name profilePicture");
+                const notificationObj = populatedNote.toObject();
+                console.log(`🔔 Notification saved for invited member ${memberId}: ${savedNote._id}`);
+                
+                if (req.io) {
+                    req.io.to(memberId.toString()).emit("newNotification", notificationObj);
+                    console.log(`📡 Socket emitted to ${memberId}`);
+                }
+            } catch (noteErr) {
+                console.error(`❌ Failed to notify invited member ${memberId}:`, noteErr.message);
             }
         });
         await Promise.all(notificationPromises);
@@ -302,8 +320,9 @@ router.delete("/:groupId/members/:memberId", checkAuth, checkAdmin, async (req, 
         });
         const savedNote = await notification.save();
         const populatedNote = await savedNote.populate("sender", "name profilePicture");
+        const notificationObj = populatedNote.toObject();
         if (req.io) {
-            req.io.to(memberId.toString()).emit("newNotification", populatedNote);
+            req.io.to(memberId.toString()).emit("newNotification", notificationObj);
         }
 
         const updatedGroup = await Group.findById(groupId)
@@ -454,19 +473,23 @@ router.delete("/:groupId", checkAuth, checkAdmin, async (req, res) => {
         const memberIds = group.members || [];
         const groupName = group.name;
 
-        // 🔔 Notify ALL members about disbandment
         const notificationPromises = memberIds.map(async (memberId) => {
-            const notification = new Notification({
-                sender: req.user.id,
-                receiver: memberId,
-                type: "group_disbanded",
-                message: `The Group "${groupName}" is disbanded`,
-                groupId: group._id
-            });
-            const savedNote = await notification.save();
-            const populatedNote = await savedNote.populate("sender", "name profilePicture");
-            if (req.io) {
-                req.io.to(memberId.toString()).emit("newNotification", populatedNote);
+            try {
+                const notification = new Notification({
+                    sender: req.user.id,
+                    receiver: memberId,
+                    type: "group_disbanded",
+                    message: `The Group "${groupName}" is disbanded`,
+                    groupId: group._id
+                });
+                const savedNote = await notification.save();
+                const populatedNote = await savedNote.populate("sender", "name profilePicture");
+                const notificationObj = populatedNote.toObject();
+                if (req.io) {
+                    req.io.to(memberId.toString()).emit("newNotification", notificationObj);
+                }
+            } catch (noteErr) {
+                console.error(`❌ Failed to notify disbanded member ${memberId}:`, noteErr.message);
             }
         });
         await Promise.all(notificationPromises);

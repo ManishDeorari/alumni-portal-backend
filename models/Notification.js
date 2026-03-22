@@ -33,4 +33,8 @@ const NotificationSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.models.Notification || mongoose.model("Notification", NotificationSchema);
+try {
+  mongoose.deleteModel('Notification');
+} catch (e) {}
+
+module.exports = mongoose.model("Notification", NotificationSchema);
