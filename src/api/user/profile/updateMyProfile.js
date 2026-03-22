@@ -55,6 +55,7 @@ module.exports = async (req, res) => {
           ...edu,
           degree: edu.degree,
           course: formattedCourse || edu.course,
+          branch: edu.branch || "",
           startYear: isNaN(startYear) ? null : startYear,
           endYear: isNaN(endYear) ? null : endYear,
           courseYearKey
