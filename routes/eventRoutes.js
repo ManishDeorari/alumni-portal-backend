@@ -7,7 +7,7 @@ const { getEvents, getEventById } = require("../src/api/events/event/getEvents")
 const deleteEvent = require("../src/api/events/event/deleteEvent");
 
 // ---------------- GET ALL EVENTS ----------------
-router.get("/", getEvents);
+router.get("/", auth, getEvents);
 
 // ---------------- GET SINGLE EVENT ----------------
 router.get("/:id", auth, getEventById);

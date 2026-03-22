@@ -10,8 +10,13 @@ const getEvents = async (req, res) => {
     // If needed, we could add registration counts here for each event
     const eventsWithCounts = await Promise.all(events.map(async (event) => {
       const registrationCount = await Registration.countDocuments({ eventId: event._id });
+      let isRegistered = false;
+      if (req.user) {
+        const reg = await Registration.findOne({ eventId: event._id, userId: req.user._id });
+        isRegistered = !!reg;
+      }
       const ev = event.toObject();
-      return { ...ev, user: ev.createdBy, registrationCount };
+      return { ...ev, content: ev.description, user: ev.createdBy, registrationCount, isRegistered };
     }));
 
     res.json({ posts: eventsWithCounts });
@@ -36,7 +41,7 @@ const getEventById = async (req, res) => {
     }
 
     const ev = event.toObject();
-    res.json({ ...ev, user: ev.createdBy, registrationCount, isRegistered });
+    res.json({ ...ev, content: ev.description, user: ev.createdBy, registrationCount, isRegistered });
   } catch (error) {
     res.status(500).json({ message: "Error fetching event" });
   }
