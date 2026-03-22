@@ -19,7 +19,7 @@ const checkAdmin = (req, res, next) => {
 // @desc    Create a new group (Admin only)
 router.post("/", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { name, description, profileImage, profileImagePublicId, isAllMemberGroup } = req.body;
+        const { name, description, profileImage, profileImagePublicId, profileImageSettings, isAllMemberGroup } = req.body;
         
         let members = req.body.members || [];
         if (isAllMemberGroup) {
