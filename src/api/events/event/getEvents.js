@@ -16,7 +16,7 @@ const getEvents = async (req, res) => {
         isRegistered = !!reg;
       }
       const ev = event.toObject();
-      return { ...ev, content: ev.description, user: ev.createdBy, registrationCount, isRegistered };
+      return { ...ev, content: ev.description, user: ev.createdBy, type: "Event", registrationCount, isRegistered };
     }));
 
     res.json({ posts: eventsWithCounts });
@@ -41,7 +41,7 @@ const getEventById = async (req, res) => {
     }
 
     const ev = event.toObject();
-    res.json({ ...ev, content: ev.description, user: ev.createdBy, registrationCount, isRegistered });
+    res.json({ ...ev, content: ev.description, user: ev.createdBy, type: "Event", registrationCount, isRegistered });
   } catch (error) {
     res.status(500).json({ message: "Error fetching event" });
   }
