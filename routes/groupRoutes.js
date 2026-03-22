@@ -20,7 +20,7 @@ const checkAdmin = (req, res, next) => {
 // @desc    Create a new group (Admin only)
 router.post("/", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { name, description, profileImage, profileImagePublicId, profileImageSettings } = req.body;
+        const { name, description, profileImage, profileImagePublicId, profileImageSettings, isAllAlumniGroup, isAllFacultyGroup } = req.body;
         
         // 🛑 Check for unique name
         const existingGroup = await Group.findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
@@ -30,6 +30,17 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
         
         // 👥 Calculate Members
         let members = req.body.members || [];
+        
+        // 🔄 Automatic Role Inclusion
+        if (isAllAlumniGroup || isAllFacultyGroup) {
+            const roleQuery = [];
+            if (isAllAlumniGroup) roleQuery.push("alumni");
+            if (isAllFacultyGroup) roleQuery.push("faculty");
+            
+            const targetedUsers = await User.find({ role: { $in: roleQuery } }, "_id");
+            const targetedIds = targetedUsers.map(u => String(u._id));
+            members = [...new Set([...members.map(m => String(m)), ...targetedIds])];
+        }
 
         // ✅ Always Auto-add all admins and main admin
         const admins = await User.find({ $or: [{ role: "admin" }, { isAdmin: true }, { isMainAdmin: true }] }, "_id");
@@ -209,7 +220,7 @@ router.post("/send", checkAuth, async (req, res) => {
 // @desc    Update group settings (Admin only)
 router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { allowFacultyMessaging, description, name, profileImage, profileImagePublicId, profileImageSettings, oldImageUrl } = req.body;
+        const { allowFacultyMessaging, description, name, profileImage, profileImagePublicId, profileImageSettings, oldImageUrl, isAllAlumni, isAllFaculty } = req.body;
         
         // 🛑 Check for unique name if it's being changed
         if (name) {
@@ -247,6 +258,18 @@ router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
             { $set: updateData }
         );
 
+        // 🔄 Automatic Role Inclusion
+        if (isAllAlumni || isAllFaculty) {
+            const roles = [];
+            if (isAllAlumni) roles.push("alumni");
+            if (isAllFaculty) roles.push("faculty");
+            const targetedUsers = await User.find({ role: { $in: roles } }, "_id");
+            const targetedIds = targetedUsers.map(u => u._id);
+            await Group.findByIdAndUpdate(req.params.groupId, {
+                $addToSet: { members: { $each: targetedIds } }
+            });
+        }
+
         const updatedGroup = await Group.findById(req.params.groupId)
             .populate("members", "name profilePicture role enrollmentNumber employeeId isMainAdmin")
             .populate("admin", "name profilePicture isMainAdmin");
@@ -262,12 +285,19 @@ router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
 // @desc    Invite/Add members to group (Admin only)
 router.post("/:groupId/invite", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { userIds, selectAll } = req.body;
+        const { userIds, selectAll, isAllAlumni, isAllFaculty } = req.body;
         let membersToAdd = userIds || [];
-
-        if (selectAll) {
-            const allUsers = await User.find({}, "_id");
-            membersToAdd = allUsers.map(u => u._id);
+        
+        if (selectAll || isAllAlumni || isAllFaculty) {
+            const query = {};
+            if (!selectAll) {
+                const roles = [];
+                if (isAllAlumni) roles.push("alumni");
+                if (isAllFaculty) roles.push("faculty");
+                query.role = { $in: roles };
+            }
+            const targetedUsers = await User.find(query, "_id");
+            membersToAdd = targetedUsers.map(u => String(u._id));
         }
 
         const group = await Group.findById(req.params.groupId);
