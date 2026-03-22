@@ -25,8 +25,13 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
         if (isAllMemberGroup) {
             const allUsers = await User.find({}, "_id");
             members = allUsers.map(u => u._id);
-        } else if (!members.includes(req.user.id)) {
-            members.push(req.user.id);
+        } else {
+            // ✅ Auto-add all admins and main admin
+            const admins = await User.find({ $or: [{ role: "admin" }, { isAdmin: true }, { isMainAdmin: true }] }, "_id");
+            const adminIds = admins.map(a => a._id.toString());
+            
+            // Merge existing members with admins and the creator
+            members = [...new Set([...members.map(m => m.toString()), ...adminIds, req.user.id])];
         }
 
         const newGroup = new Group({
@@ -166,11 +171,26 @@ router.post("/send", checkAuth, async (req, res) => {
 // @desc    Update group settings (Admin only)
 router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { allowFacultyMessaging, description, name, profileImage, profileImagePublicId } = req.body;
+        const { allowFacultyMessaging, description, name, profileImage, profileImagePublicId, oldImageUrl } = req.body;
         
+        // 🧹 Cloudinary cleanup for old image if being replaced
+        if (oldImageUrl && oldImageUrl.includes("res.cloudinary.com") && !oldImageUrl.includes("default-group.jpg")) {
+            if (profileImage !== oldImageUrl) {
+                const publicId = extractPublicId(oldImageUrl);
+                if (publicId) {
+                    try {
+                        await cloudinary.uploader.destroy(publicId);
+                        console.log(`🗑 Deleted old group image: ${publicId}`);
+                    } catch (err) {
+                        console.error("❌ Failed to delete old group image:", err);
+                    }
+                }
+            }
+        }
+
         const updateData = { allowFacultyMessaging, description, name };
-        if (profileImage) updateData.profileImage = profileImage;
-        if (profileImagePublicId) updateData.profileImagePublicId = profileImagePublicId;
+        if (profileImage !== undefined) updateData.profileImage = profileImage || "/default-group.jpg";
+        if (profileImagePublicId !== undefined) updateData.profileImagePublicId = profileImagePublicId;
 
         const group = await Group.findByIdAndUpdate(
             req.params.groupId,
@@ -307,5 +327,49 @@ router.post("/:groupId/react", checkAuth, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// @route   DELETE /api/groups/:groupId/image
+// @desc    Remove group profile image and revert to default (Admin only)
+router.delete("/:groupId/image", checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const group = await Group.findById(req.params.groupId);
+        if (!group) return res.status(404).json({ message: "Group not found" });
+
+        // Delete from Cloudinary if not default
+        if (group.profileImage && group.profileImage.includes("res.cloudinary.com") && !group.profileImage.includes("default-group.jpg")) {
+            const publicId = extractPublicId(group.profileImage);
+            if (publicId) {
+                try {
+                    await cloudinary.uploader.destroy(publicId);
+                    console.log(`🗑 Deleted group image for reset: ${publicId}`);
+                } catch (err) {
+                    console.error("❌ Cloudinary deletion failed:", err);
+                }
+            }
+        }
+
+        group.profileImage = "/default-group.jpg";
+        group.profileImagePublicId = null;
+        await group.save();
+
+        res.json({ message: "Group image removed", group });
+    } catch (err) {
+        console.error("Error deleting group image:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// Helper to extract Cloudinary public ID
+function extractPublicId(imageUrl) {
+    try {
+        imageUrl = imageUrl.split("?")[0];
+        const afterUpload = imageUrl.split("/upload/")[1];
+        if (!afterUpload) return null;
+        const noVersion = afterUpload.replace(/v\d+\//, "");
+        return noVersion.substring(0, noVersion.lastIndexOf(".")) || noVersion;
+    } catch (e) {
+        return null;
+    }
+}
 
 module.exports = router;
