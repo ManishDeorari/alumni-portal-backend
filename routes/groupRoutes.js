@@ -192,12 +192,11 @@ router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
         if (profileImage !== undefined) updateData.profileImage = profileImage || "/default-group.jpg";
         if (profileImagePublicId !== undefined) updateData.profileImagePublicId = profileImagePublicId;
 
-        const group = await Group.findByIdAndUpdate(
-            req.params.groupId,
-            { $set: updateData },
-            { new: true }
-        );
-        res.json(group);
+        const updatedGroup = await Group.findById(req.params.groupId)
+            .populate("members", "name profilePicture role enrollmentNumber employeeId")
+            .populate("admin", "name profilePicture");
+
+        res.json(updatedGroup);
     } catch (err) {
         console.error("Error updating group settings:", err);
         res.status(500).json({ message: "Server error" });
@@ -225,7 +224,11 @@ router.post("/:groupId/invite", checkAuth, checkAdmin, async (req, res) => {
         group.members = updatedMembers;
         await group.save();
 
-        res.json({ message: "Members added successfully", group });
+        const updatedGroup = await Group.findById(req.params.groupId)
+            .populate("members", "name profilePicture role enrollmentNumber employeeId")
+            .populate("admin", "name profilePicture");
+
+        res.json({ message: "Members added successfully", group: updatedGroup });
     } catch (err) {
         console.error("Error inviting members:", err);
         res.status(500).json({ message: "Server error" });
@@ -243,7 +246,11 @@ router.delete("/:groupId/members/:memberId", checkAuth, checkAdmin, async (req, 
         group.members = group.members.filter(m => m.toString() !== memberId);
         await group.save();
 
-        res.json({ message: "Member removed", group });
+        const updatedGroup = await Group.findById(groupId)
+            .populate("members", "name profilePicture role enrollmentNumber employeeId")
+            .populate("admin", "name profilePicture");
+
+        res.json({ message: "Member removed", group: updatedGroup });
     } catch (err) {
         console.error("Error removing member:", err);
         res.status(500).json({ message: "Server error" });
@@ -352,7 +359,11 @@ router.delete("/:groupId/image", checkAuth, checkAdmin, async (req, res) => {
         group.profileImagePublicId = null;
         await group.save();
 
-        res.json({ message: "Group image removed", group });
+        const updatedGroup = await Group.findById(req.params.groupId)
+            .populate("members", "name profilePicture role enrollmentNumber employeeId")
+            .populate("admin", "name profilePicture");
+
+        res.json({ message: "Group image removed", group: updatedGroup });
     } catch (err) {
         console.error("Error deleting group image:", err);
         res.status(500).json({ message: "Server error" });
