@@ -618,4 +618,40 @@ router.delete("/:groupId", checkAuth, checkAdmin, async (req, res) => {
     }
 });
 
+
+// @route   POST /api/groups/:groupId/remove-role
+// @desc    Remove all members of a specific role (Admin only)
+router.post("/:groupId/remove-role", checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const { role } = req.body;
+        if (!["alumni", "faculty"].includes(role)) {
+            return res.status(400).json({ message: "Invalid role specified" });
+        }
+
+        const group = await Group.findById(req.params.groupId);
+        if (!group) return res.status(404).json({ message: "Group not found" });
+
+        // Keep members who DON'T have the matching role OR are the group admin
+        const usersToKeep = await User.find({
+            _id: { $in: group.members },
+            $or: [
+                { role: { $ne: role } },
+                { _id: group.admin }
+            ]
+        }, "_id");
+
+        group.members = usersToKeep.map(u => u._id);
+        await group.save();
+
+        const updatedGroup = await Group.findById(req.params.groupId)
+            .populate("members", "name profilePicture role enrollmentNumber employeeId isMainAdmin")
+            .populate("admin", "name profilePicture isMainAdmin");
+
+        res.json(updatedGroup);
+    } catch (err) {
+        console.error("Error in bulk role removal:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
 module.exports = router;
