@@ -20,7 +20,7 @@ const checkAdmin = (req, res, next) => {
 // @desc    Create a new group (Admin only)
 router.post("/", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { name, description, profileImage, profileImagePublicId, profileImageSettings, isAllMemberGroup } = req.body;
+        const { name, description, profileImage, profileImagePublicId, profileImageSettings, isAllAlumniGroup, isAllFacultyGroup } = req.body;
         
         // 🛑 Check for unique name
         const existingGroup = await Group.findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
@@ -28,18 +28,25 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
             return res.status(400).json({ message: "A group with this name already exists. Please choose a unique name." });
         }
         
+        // 👥 Calculate Members
         let members = req.body.members || [];
-        if (isAllMemberGroup) {
-            const allUsers = await User.find({}, "_id");
-            members = allUsers.map(u => u._id);
-        } else {
-            // ✅ Auto-add all admins and main admin
-            const admins = await User.find({ $or: [{ role: "admin" }, { isAdmin: true }, { isMainAdmin: true }] }, "_id");
-            const adminIds = admins.map(a => a._id.toString());
+        
+        // 🔄 Automatic Role Inclusion
+        if (isAllAlumniGroup || isAllFacultyGroup) {
+            const roleQuery = [];
+            if (isAllAlumniGroup) roleQuery.push("alumni");
+            if (isAllFacultyGroup) roleQuery.push("faculty");
             
-            // Merge existing members with admins and the creator
-            members = [...new Set([...members.map(m => m.toString()), ...adminIds, req.user.id])];
+            const targetedUsers = await User.find({ role: { $in: roleQuery } }, "_id");
+            members = [...new Set([...members, ...targetedUsers.map(u => String(u._id))])];
         }
+
+        // ✅ Always Auto-add all admins and main admin
+        const admins = await User.find({ $or: [{ role: "admin" }, { isAdmin: true }, { isMainAdmin: true }] }, "_id");
+        const adminIds = admins.map(a => a._id.toString());
+        
+        // Merge everything (manually selected + role-based + admins + creator)
+        members = [...new Set([...members.map(m => String(m)), ...adminIds, String(req.user.id)])];
 
         const newGroup = new Group({
             name,
