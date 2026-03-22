@@ -5,6 +5,7 @@ const Group = require("../models/Group");
 const GroupMessage = require("../models/GroupMessage");
 const User = require("../models/User");
 const cloudinary = require("../config/cloudinary");
+const Notification = require("../models/Notification");
 
 // Middleware to check if user is admin
 const checkAdmin = (req, res, next) => {
@@ -46,6 +47,24 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
         });
 
         await newGroup.save();
+
+        // 🔔 Notify members about joining the group
+        const notificationPromises = members.map(async (memberId) => {
+            const notification = new Notification({
+                sender: req.user.id,
+                receiver: memberId,
+                type: "group_joined",
+                message: `You have joined group "${newGroup.name}"`,
+                groupId: newGroup._id
+            });
+            const savedNote = await notification.save();
+            const populatedNote = await savedNote.populate("sender", "name profilePicture");
+            if (req.io) {
+                req.io.to(memberId.toString()).emit("newNotification", populatedNote);
+            }
+        });
+        await Promise.all(notificationPromises);
+
         res.status(201).json(newGroup);
     } catch (err) {
         console.error("Error creating group:", err);
@@ -225,11 +244,31 @@ router.post("/:groupId/invite", checkAuth, checkAdmin, async (req, res) => {
         const group = await Group.findById(req.params.groupId);
         if (!group) return res.status(404).json({ message: "Group not found" });
 
+        const oldMemberIds = group.members.map(m => m.toString());
         // Merge and remove duplicates
-        const updatedMembers = [...new Set([...group.members.map(m => m.toString()), ...membersToAdd.map(m => m.toString())])];
+        const updatedMembers = [...new Set([...oldMemberIds, ...membersToAdd.map(m => m.toString())])];
+        
+        const newMemberIds = updatedMembers.filter(id => !oldMemberIds.includes(id));
         
         group.members = updatedMembers;
         await group.save();
+
+        // 🔔 Notify new members
+        const notificationPromises = newMemberIds.map(async (memberId) => {
+            const notification = new Notification({
+                sender: req.user.id,
+                receiver: memberId,
+                type: "group_added",
+                message: `You have been added to group "${group.name}"`,
+                groupId: group._id
+            });
+            const savedNote = await notification.save();
+            const populatedNote = await savedNote.populate("sender", "name profilePicture");
+            if (req.io) {
+                req.io.to(memberId.toString()).emit("newNotification", populatedNote);
+            }
+        });
+        await Promise.all(notificationPromises);
 
         const updatedGroup = await Group.findById(req.params.groupId)
             .populate("members", "name profilePicture role enrollmentNumber employeeId")
@@ -252,6 +291,20 @@ router.delete("/:groupId/members/:memberId", checkAuth, checkAdmin, async (req, 
 
         group.members = group.members.filter(m => m.toString() !== memberId);
         await group.save();
+
+        // 🔔 Notify removed member
+        const notification = new Notification({
+            sender: req.user.id,
+            receiver: memberId,
+            type: "group_removed",
+            message: `You have been removed from group "${group.name}"`,
+            groupId: group._id
+        });
+        const savedNote = await notification.save();
+        const populatedNote = await savedNote.populate("sender", "name profilePicture");
+        if (req.io) {
+            req.io.to(memberId.toString()).emit("newNotification", populatedNote);
+        }
 
         const updatedGroup = await Group.findById(groupId)
             .populate("members", "name profilePicture role enrollmentNumber employeeId")
@@ -390,5 +443,45 @@ function extractPublicId(imageUrl) {
         return null;
     }
 }
+
+// @route   DELETE /api/groups/:groupId
+// @desc    Delete a group (Admin only)
+router.delete("/:groupId", checkAuth, checkAdmin, async (req, res) => {
+    try {
+        const group = await Group.findById(req.params.groupId);
+        if (!group) return res.status(404).json({ message: "Group not found" });
+
+        const memberIds = group.members || [];
+        const groupName = group.name;
+
+        // 🔔 Notify ALL members about disbandment
+        const notificationPromises = memberIds.map(async (memberId) => {
+            const notification = new Notification({
+                sender: req.user.id,
+                receiver: memberId,
+                type: "group_disbanded",
+                message: `The Group "${groupName}" is disbanded`,
+                groupId: group._id
+            });
+            const savedNote = await notification.save();
+            const populatedNote = await savedNote.populate("sender", "name profilePicture");
+            if (req.io) {
+                req.io.to(memberId.toString()).emit("newNotification", populatedNote);
+            }
+        });
+        await Promise.all(notificationPromises);
+
+        // Delete group messages
+        await GroupMessage.deleteMany({ groupId: req.params.groupId });
+        
+        // Delete the group itself
+        await Group.findByIdAndDelete(req.params.groupId);
+
+        res.json({ message: "Group and its messages deleted successfully" });
+    } catch (err) {
+        console.error("Error deleting group:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
 
 module.exports = router;

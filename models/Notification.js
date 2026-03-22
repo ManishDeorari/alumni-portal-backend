@@ -6,8 +6,25 @@ const NotificationSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ["connect_request", "connect_accept", "post_like", "post_comment", "comment_like", "comment_reply", "reply_like", "comment_reaction", "reply_reaction", "profile_visit", "admin_notice"]
+    enum: [
+      "connect_request", 
+      "connect_accept", 
+      "post_like", 
+      "post_comment", 
+      "comment_like", 
+      "comment_reply", 
+      "reply_like", 
+      "comment_reaction", 
+      "reply_reaction", 
+      "profile_visit", 
+      "admin_notice",
+      "group_joined",
+      "group_added",
+      "group_removed",
+      "group_disbanded"
+    ]
   },
+  groupId: { type: mongoose.Schema.Types.ObjectId, ref: "Group" },
   message: { type: String, required: true },
   postId: { type: mongoose.Schema.Types.ObjectId, ref: "Post" },
   commentId: { type: mongoose.Schema.Types.ObjectId }, // Reference within the post.comments array
