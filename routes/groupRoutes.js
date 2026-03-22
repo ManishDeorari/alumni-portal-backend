@@ -498,6 +498,33 @@ router.delete("/:groupId", checkAuth, checkAdmin, async (req, res) => {
 
         const memberIds = group.members || [];
         const groupName = group.name;
+        const groupPublicId = group.profileImagePublicId;
+
+        // 🔍 Collect all message media IDs before deleting from DB
+        const messagesWithMedia = await GroupMessage.find({ 
+            groupId: req.params.groupId, 
+            mediaPublicId: { $exists: true, $ne: null } 
+        }, "mediaPublicId");
+        const messagePublicIds = messagesWithMedia.map(m => m.mediaPublicId);
+
+        // 🗑️ Background Asset Cleanup (Cloudinary)
+        setImmediate(async () => {
+            try {
+                const allPublicIds = [...messagePublicIds];
+                if (groupPublicId) allPublicIds.push(groupPublicId);
+
+                if (allPublicIds.length > 0) {
+                    console.log(`🗑️ Deleting ${allPublicIds.length} assets from Cloudinary for group: ${groupName}`);
+                    await Promise.all(allPublicIds.map(id => 
+                        cloudinary.uploader.destroy(id).catch(err => 
+                            console.error(`❌ Failed to delete asset ${id}:`, err.message)
+                        )
+                    ));
+                }
+            } catch (err) {
+                console.error("❌ Background asset cleanup error:", err);
+            }
+        });
 
         // 🔔 Background Batch Notification for speed
         setImmediate(async () => {
