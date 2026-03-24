@@ -1,4 +1,6 @@
 const Post = require("../../../../models/Post");
+const Event = require("../../../../models/Event");
+const Registration = require("../../../../models/Registration");
 
 const getPosts = async (req, res) => {
   try {
@@ -6,19 +8,53 @@ const getPosts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const type = req.query.type || "Regular";
     const userId = req.query.userId;
-    let filter = {};
+    
+    // === "ALL" FETCHING LOGIC ===
+    if (type === "all" || type === "All") {
+      let filter = {};
+      if (userId) filter.user = userId;
+      
+      const posts = await Post.find(filter)
+        .populate("user", "name profilePicture")
+        .populate({ path: "comments.user", select: "name profilePicture" })
+        .populate({ path: "comments.replies.user", select: "name profilePicture" });
+        
+      let eventFilter = userId ? { createdBy: userId } : {};
+      const events = await Event.find(eventFilter)
+        .populate("createdBy", "name profilePicture");
+        
+      const mappedEvents = await Promise.all(events.map(async (e) => {
+        const regCount = await Registration.countDocuments({ eventId: e._id });
+        let isRegistered = false;
+        let myRegistration = null;
+        if (req.user) {
+          const reqUserId = req.user._id || req.user.id;
+          const reg = await Registration.findOne({ eventId: e._id, userId: reqUserId });
+          if (reg) {
+            isRegistered = true;
+            myRegistration = reg.toObject ? reg.toObject() : reg;
+          }
+        }
+        const ev = e.toObject ? e.toObject() : e;
+        return { ...ev, content: ev.description, user: ev.createdBy, type: "Event", registrationCount: regCount, isRegistered, myRegistration };
+      }));
+      
+      const allContent = [...posts, ...mappedEvents].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const startIndex = (page - 1) * limit;
+      const paginatedContent = allContent.slice(startIndex, startIndex + limit);
+      
+      return res.json({ posts: paginatedContent, total: allContent.length });
+    }
 
-    if (type === "all") {
-      filter = {};
-    } else if (type === "Regular") {
+    // === STANDARD FETCHING LOGIC ===
+    let filter = {};
+    if (type === "Regular") {
       filter = { $or: [{ type: "Regular" }, { type: { $exists: false } }, { type: null }] };
     } else {
       filter = { type };
     }
 
-    if (userId) {
-      filter.user = userId;
-    }
+    if (userId) filter.user = userId;
 
     const posts = await Post.find(filter)
       .sort({ createdAt: -1 })
