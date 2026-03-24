@@ -47,7 +47,8 @@ const createEvent = async (req, res) => {
         profileLink: true,
         enrollmentNumber: true,
         email: true,
-        mobileNumber: true,
+        phoneNumber: true,
+        course: true,
         courseYear: true,
         branchName: true,
         currentCompany: true,
@@ -61,10 +62,13 @@ const createEvent = async (req, res) => {
     await event.save();
     const populated = await event.populate("createdBy", "name profilePicture");
     
-    // Notify via socket if needed
-    req.io?.emit("eventCreated", populated);
+    const ev = populated.toObject();
+    const eventResp = { ...ev, user: ev.createdBy, type: "Event", content: ev.description };
 
-    res.status(201).json({ event: populated });
+    // Notify via socket if needed
+    req.io?.emit("eventCreated", eventResp);
+
+    res.status(201).json({ event: eventResp });
   } catch (err) {
     console.error("❌ Event creation failed:", err);
     res.status(500).json({ message: "Failed to create event" });

@@ -7,16 +7,19 @@ const getEvents = async (req, res) => {
       .populate("createdBy", "name profilePicture")
       .sort({ createdAt: -1 });
 
-    // If needed, we could add registration counts here for each event
     const eventsWithCounts = await Promise.all(events.map(async (event) => {
       const registrationCount = await Registration.countDocuments({ eventId: event._id });
       let isRegistered = false;
+      let myRegistration = null;
       if (req.user) {
         const reg = await Registration.findOne({ eventId: event._id, userId: req.user._id });
-        isRegistered = !!reg;
+        if (reg) {
+          isRegistered = true;
+          myRegistration = reg.toObject ? reg.toObject() : reg;
+        }
       }
       const ev = event.toObject();
-      return { ...ev, content: ev.description, user: ev.createdBy, type: "Event", registrationCount, isRegistered };
+      return { ...ev, content: ev.description, user: ev.createdBy, type: "Event", registrationCount, isRegistered, myRegistration };
     }));
 
     res.json({ posts: eventsWithCounts });
@@ -35,13 +38,17 @@ const getEventById = async (req, res) => {
     
     // Check if the current user is registered
     let isRegistered = false;
+    let myRegistration = null;
     if (req.user) {
       const registration = await Registration.findOne({ eventId: event._id, userId: req.user._id || req.user.id });
-      isRegistered = !!registration;
+      if (registration) {
+        isRegistered = true;
+        myRegistration = registration.toObject ? registration.toObject() : registration;
+      }
     }
 
     const ev = event.toObject();
-    res.json({ ...ev, content: ev.description, user: ev.createdBy, type: "Event", registrationCount, isRegistered });
+    res.json({ ...ev, content: ev.description, user: ev.createdBy, type: "Event", registrationCount, isRegistered, myRegistration });
   } catch (error) {
     res.status(500).json({ message: "Error fetching event" });
   }

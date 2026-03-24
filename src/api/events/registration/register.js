@@ -15,10 +15,20 @@ const registerEvent = async (req, res) => {
       return res.status(400).json({ message: "Registration for this event has closed." });
     }
 
-    // Check if already registered
+    // Check if already registered - Update instead of reject
     const existingRegistration = await Registration.findOne({ userId, eventId });
     if (existingRegistration) {
-      return res.status(400).json({ message: "You are already registered for this event." });
+      // Validate group registration
+      if (isGroup && !event.allowGroupRegistration) {
+        return res.status(400).json({ message: "Group registration is not allowed for this event." });
+      }
+
+      existingRegistration.isGroup = !!isGroup;
+      existingRegistration.groupMembers = isGroup ? groupMembers : [];
+      existingRegistration.answers = answers || {};
+      await existingRegistration.save();
+
+      return res.status(200).json({ message: "Registration updated successfully!", registration: existingRegistration });
     }
 
     // Validate group registration
