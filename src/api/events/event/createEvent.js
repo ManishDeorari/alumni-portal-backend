@@ -66,7 +66,7 @@ const createEvent = async (req, res) => {
     const eventResp = { ...ev, user: ev.createdBy, type: "Event", content: ev.description };
 
     // Notify via socket if needed
-    req.io?.emit("eventCreated", eventResp);
+    req.io?.emit("postCreated", eventResp);
 
     res.status(201).json({ event: eventResp });
   } catch (err) {
