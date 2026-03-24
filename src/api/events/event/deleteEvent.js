@@ -11,10 +11,45 @@ const deleteEvent = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to delete this event" });
     }
 
-    // Delete all registrations associated with this event
+    // Cleanup 1: Delete images from Cloudinary
+    const cloudinary = require("cloudinary").v2;
+    for (const image of event.images || []) {
+      if (image.public_id) {
+        try {
+          await cloudinary.uploader.destroy(image.public_id, { resource_type: "image" });
+        } catch (err) {
+          console.error("❌ Image delete failed:", err.message);
+        }
+      }
+    }
+
+    // Cleanup 2: Delete video from Cloudinary
+    if (event.video?.public_id) {
+      const fallbackTypes = ["video", "raw", "auto"];
+      for (const type of fallbackTypes) {
+        try {
+          const result = await cloudinary.uploader.destroy(event.video.public_id, {
+            resource_type: type,
+          });
+          if (result.result === "ok") break;
+        } catch (err) {
+          console.error(`❌ Failed deleting video as ${type}:`, err.message);
+        }
+      }
+    }
+
+    // Cleanup 3: Delete related Notifications
+    try {
+      const Notification = require("../../../../models/Notification");
+      await Notification.deleteMany({ postId: event._id });
+    } catch (err) {
+      console.error("❌ Failed deleting notifications:", err.message);
+    }
+
+    // Cleanup 4: Delete all registrations associated with this event
     await Registration.deleteMany({ eventId: event._id });
     
-    // Delete the event itself
+    // Cleanup 5: Delete the event itself
     await Event.findByIdAndDelete(req.params.id);
 
     res.json({ message: "Event and associated registrations deleted successfully" });

@@ -57,6 +57,14 @@ const deletePost = async (req, res) => {
       }
     }
 
+    // Cleanup Notifications for this post
+    try {
+      const Notification = require("../../../../models/Notification");
+      await Notification.deleteMany({ postId: req.params.id });
+    } catch (err) {
+      console.error("❌ Failed deleting notifications for post:", err.message);
+    }
+
     await Post.findByIdAndDelete(req.params.id);
     req.io.emit("postDeleted", { postId: req.params.id });
 
