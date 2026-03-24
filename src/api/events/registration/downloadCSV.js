@@ -19,29 +19,34 @@ const downloadCSV = async (req, res) => {
       return res.status(404).json({ message: "No registrations found" });
     }
 
-    // Define CSV headers based on registration fields and custom questions
-    const headers = ["Name", "Email", "Enrollment Number", "Is Group", "Group Members", "Registration Date"];
+    const baseFields = Object.keys(event.registrationFields || {}).filter(field => event.registrationFields[field] === true);
+    const baseHeaders = baseFields.map(field => field.replace(/([A-Z])/g, ' $1').trim());
+    
+    const headers = [...baseHeaders, "Is Group", "Group Members", "Registration Date"];
     
     // Add custom questions to headers
     event.customQuestions.forEach(q => headers.push(q.question));
 
-    let csvContent = headers.join(",") + "\n";
+    let csvContent = headers.map(h => `"${h}"`).join(",") + "\n";
 
     registrations.forEach(reg => {
       const user = reg.userId || {};
-      const row = [
-        `"${user.name || ""}"`,
-        `"${user.email || ""}"`,
-        `"${user.enrollmentNumber || ""}"`,
-        reg.isGroup ? "Yes" : "No",
-        `"${reg.groupMembers.map(m => m.name).join("; ") || ""}"`,
-        new Date(reg.registeredAt).toLocaleString(),
-      ];
+      const row = [];
+
+      baseFields.forEach(field => {
+        let answer = reg.answers?.get ? reg.answers.get(field) : reg.answers?.[field];
+        if (!answer) answer = user[field] || "";
+        row.push(`"${String(answer).replace(/"/g, '""')}"`);
+      });
+
+      row.push(`"${reg.isGroup ? "Yes" : "No"}"`);
+      row.push(`"${reg.groupMembers.map(m => m.name).join("; ") || ""}"`);
+      row.push(`"${new Date(reg.registeredAt).toLocaleString()}"`);
 
       // Add answers to custom questions
       event.customQuestions.forEach(q => {
-        const answer = reg.answers.get ? reg.answers.get(q.question) : reg.answers[q.question];
-        row.push(`"${answer || ""}"`);
+        const answer = reg.answers?.get ? reg.answers.get(q.question) : reg.answers?.[q.question];
+        row.push(`"${String(answer || "").replace(/"/g, '""')}"`);
       });
 
       csvContent += row.join(",") + "\n";
