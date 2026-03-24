@@ -28,6 +28,18 @@ const registerEvent = async (req, res) => {
       existingRegistration.answers = answers || {};
       await existingRegistration.save();
 
+      // Recalculate true headcount globally
+      const allRegs = await Registration.find({ eventId });
+      let totalHeadcount = 0;
+      allRegs.forEach(reg => {
+         totalHeadcount += 1 + (reg.isGroup ? (reg.groupMembers?.length || 0) : 0);
+      });
+
+      req.io?.emit("registrationCountUpdated", { 
+         postId: eventId, 
+         registrationCount: totalHeadcount 
+      });
+
       return res.status(200).json({ message: "Registration updated successfully!", registration: existingRegistration });
     }
 
@@ -45,6 +57,19 @@ const registerEvent = async (req, res) => {
     });
 
     await registration.save();
+
+    // Calculate realistic headcount accurately including group subsets
+    const allRegs = await Registration.find({ eventId });
+    let totalHeadcount = 0;
+    allRegs.forEach(reg => {
+       totalHeadcount += 1 + (reg.isGroup ? (reg.groupMembers?.length || 0) : 0);
+    });
+
+    // Notify all connected clients dynamically
+    req.io?.emit("registrationCountUpdated", { 
+       postId: eventId, 
+       registrationCount: totalHeadcount 
+    });
 
     res.status(201).json({ message: "Successfully registered for the event!", registration });
   } catch (error) {
