@@ -52,6 +52,10 @@ const deleteEvent = async (req, res) => {
     // Cleanup 5: Delete the event itself
     await Event.findByIdAndDelete(req.params.id);
 
+    if (req.io) {
+      req.io.emit("postDeleted", { postId: req.params.id });
+    }
+
     res.json({ message: "Event and associated registrations deleted successfully" });
   } catch (error) {
     console.error("Delete event error:", error);
