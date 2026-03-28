@@ -70,11 +70,9 @@ const downloadCSV = async (req, res) => {
             
             // Map member fields to matching baseFields 
             baseFields.forEach(field => {
-                 let val = "";
-                 if (field === "name") val = member.name || "";
-                 else if (field === "email") val = member.email || "";
-                 else if (field === "mobileNumber" || field === "phoneNumber") val = member.mobile || "";
-                 else if (field === "enrollmentNumber") val = member.enrollmentNumber || "";
+                 const isPhone = field === "phoneNumber" || field === "mobileNumber";
+                 const key = isPhone ? "mobile" : field;
+                 let val = member[key] || "";
                  memberRow.push(`"${String(val).replace(/"/g, '""')}"`);
             });
 
@@ -86,9 +84,10 @@ const downloadCSV = async (req, res) => {
             // Registration Date
             memberRow.push(`"${new Date(reg.registeredAt).toLocaleString()}"`);
 
-            // Custom Questions (Empty for group members)
-            event.customQuestions.forEach(() => {
-                memberRow.push('""'); 
+            // Custom Questions (Now populated for group members)
+            event.customQuestions.forEach(q => {
+                const answer = member[q.question] || "";
+                memberRow.push(`"${String(answer).replace(/"/g, '""')}"`);
             });
 
             csvContent += memberRow.join(",") + "\n";
