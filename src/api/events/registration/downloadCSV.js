@@ -5,7 +5,7 @@ const downloadCSV = async (req, res) => {
   try {
     const { eventId } = req.params;
 
-    if (!req.user.isAdmin) {
+    if (!req.user.isAdmin && req.user.role !== 'faculty') {
       return res.status(403).json({ message: "Not authorized" });
     }
 
@@ -22,7 +22,15 @@ const downloadCSV = async (req, res) => {
     const baseFields = Object.keys(event.registrationFields || {}).filter(field => event.registrationFields[field] === true);
     const baseHeaders = baseFields.map(field => field.replace(/([A-Z])/g, ' $1').trim());
     
-    const headers = [...baseHeaders, "Is Group", "Group Members", "Registration Date"];
+    // Core headers
+    let headers = [...baseHeaders];
+    
+    // Identify if group tracking is needed
+    if (event.allowGroupRegistration) {
+      headers.push("Group Role", "Led By");
+    }
+    
+    headers.push("Registration Date");
     
     // Add custom questions to headers
     event.customQuestions.forEach(q => headers.push(q.question));
@@ -33,23 +41,59 @@ const downloadCSV = async (req, res) => {
       const user = reg.userId || {};
       const row = [];
 
+      // 1. Team Lead Data 
       baseFields.forEach(field => {
         let answer = reg.answers?.get ? reg.answers.get(field) : reg.answers?.[field];
         if (!answer) answer = user[field] || "";
         row.push(`"${String(answer).replace(/"/g, '""')}"`);
       });
 
-      row.push(`"${reg.isGroup ? "Yes" : "No"}"`);
-      row.push(`"${reg.groupMembers.map(m => m.name).join("; ") || ""}"`);
+      if (event.allowGroupRegistration) {
+         row.push(`"${reg.isGroup ? "Team Lead" : "Individual"}"`);
+         row.push('""'); // Team leads are not led by anyone
+      }
+
       row.push(`"${new Date(reg.registeredAt).toLocaleString()}"`);
 
-      // Add answers to custom questions
+      // Add answers to custom questions (ONLY for Team Lead / Individual)
       event.customQuestions.forEach(q => {
         const answer = reg.answers?.get ? reg.answers.get(q.question) : reg.answers?.[q.question];
         row.push(`"${String(answer || "").replace(/"/g, '""')}"`);
       });
 
       csvContent += row.join(",") + "\n";
+
+      // 2. Group Members Iteration 
+      if (event.allowGroupRegistration && reg.isGroup && reg.groupMembers?.length > 0) {
+        reg.groupMembers.forEach(member => {
+            const memberRow = [];
+            
+            // Map member fields to matching baseFields 
+            baseFields.forEach(field => {
+                 let val = "";
+                 if (field === "name") val = member.name || "";
+                 else if (field === "email") val = member.email || "";
+                 else if (field === "mobileNumber" || field === "phoneNumber") val = member.mobile || "";
+                 else if (field === "enrollmentNumber") val = member.enrollmentNumber || "";
+                 memberRow.push(`"${String(val).replace(/"/g, '""')}"`);
+            });
+
+            // Group Tracking
+            memberRow.push('"Group Member"');
+            // Link to team lead (email or name)
+            memberRow.push(`"${String(user.email || user.name || "Unknown").replace(/"/g, '""')}"`);
+
+            // Registration Date
+            memberRow.push(`"${new Date(reg.registeredAt).toLocaleString()}"`);
+
+            // Custom Questions (Empty for group members)
+            event.customQuestions.forEach(() => {
+                memberRow.push('""'); 
+            });
+
+            csvContent += memberRow.join(",") + "\n";
+        });
+      }
     });
 
     res.setHeader("Content-Type", "text/csv");
