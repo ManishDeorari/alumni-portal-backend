@@ -93,6 +93,9 @@ const downloadCSV = async (req, res) => {
             csvContent += memberRow.join(",") + "\n";
         });
       }
+      
+      // Add an empty line to separate this registration block from the next
+      csvContent += "\n";
     });
 
     res.setHeader("Content-Type", "text/csv");
