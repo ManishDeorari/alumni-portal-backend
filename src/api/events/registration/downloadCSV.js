@@ -104,9 +104,10 @@ const downloadCSV = async (req, res) => {
       }
     });
 
-    res.setHeader("Content-Type", "text/csv");
+    const BOM = "\uFEFF";
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename=registrations_${event.title.replace(/\s+/g, "_")}.csv`);
-    res.status(200).send(csvContent);
+    res.status(200).send(BOM + csvContent);
   } catch (error) {
     console.error("CSV download error:", error);
     res.status(500).json({ message: "Error generating CSV" });
