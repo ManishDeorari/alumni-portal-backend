@@ -1,4 +1,30 @@
 const Event = require("../../../../models/Event");
+const Registration = require("../../../../models/Registration");
+
+const getEventMetadata = async (event, userId) => {
+  const ev = event.toObject ? event.toObject({ flattenMaps: true }) : event;
+  const registrationCount = await Registration.countDocuments({ eventId: ev._id });
+  
+  let isRegistered = false;
+  let myRegistration = null;
+  if (userId) {
+    const reg = await Registration.findOne({ eventId: ev._id, userId });
+    if (reg) {
+      isRegistered = true;
+      myRegistration = reg.toObject ? reg.toObject({ flattenMaps: true }) : reg;
+    }
+  }
+
+  return { 
+    ...ev, 
+    user: ev.createdBy, 
+    type: "Event", 
+    content: ev.description,
+    registrationCount,
+    isRegistered,
+    myRegistration
+  };
+};
 
 const reactToEvent = async (req, res) => {
   try {
@@ -34,11 +60,11 @@ const reactToEvent = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const ev = updatedEvent.toObject();
-    const eventResp = { ...ev, user: ev.createdBy, type: "Event", content: ev.description };
+    const eventResp = await getEventMetadata(updatedEvent, req.user?._id);
+    const broadcastEvent = { ...eventResp, isRegistered: undefined, myRegistration: undefined };
 
     if (req.io) {
-      req.io.emit("postReacted", eventResp);
+      req.io.emit("postReacted", broadcastEvent);
     }
 
     res.status(200).json(eventResp);
@@ -69,11 +95,11 @@ const commentOnEvent = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const ev = updatedEvent.toObject();
-    const eventResp = { ...ev, user: ev.createdBy, type: "Event", content: ev.description };
+    const eventResp = await getEventMetadata(updatedEvent, req.user?._id);
+    const broadcastEvent = { ...eventResp, isRegistered: undefined, myRegistration: undefined };
 
     if (req.io) {
-      req.io.emit("updatePost", eventResp);
+      req.io.emit("updatePost", broadcastEvent);
     }
 
     res.status(201).json(eventResp);
@@ -105,11 +131,11 @@ const editEvent = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const ev = updatedEvent.toObject();
-    const eventResp = { ...ev, user: ev.createdBy, type: "Event", content: ev.description };
+    const eventResp = await getEventMetadata(updatedEvent, req.user?._id);
+    const broadcastEvent = { ...eventResp, isRegistered: undefined, myRegistration: undefined };
 
     if (req.io) {
-      req.io.emit("updatePost", eventResp);
+      req.io.emit("updatePost", broadcastEvent);
     }
 
     res.status(200).json(eventResp);
@@ -133,8 +159,9 @@ const deleteCommentFromEvent = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const eventResp = { ...updatedEvent.toObject(), user: updatedEvent.createdBy, type: "Event", content: updatedEvent.description };
-    if (req.io) req.io.emit("updatePost", eventResp);
+    const eventResp = await getEventMetadata(updatedEvent, req.user?._id);
+    const broadcastEvent = { ...eventResp, isRegistered: undefined, myRegistration: undefined };
+    if (req.io) req.io.emit("updatePost", broadcastEvent);
     res.json(eventResp);
   } catch (error) {
     res.status(500).json({ error: "Server error" });
@@ -159,8 +186,9 @@ const editCommentOnEvent = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const eventResp = { ...updatedEvent.toObject(), user: updatedEvent.createdBy, type: "Event", content: updatedEvent.description };
-    if (req.io) req.io.emit("updatePost", eventResp);
+    const eventResp = await getEventMetadata(updatedEvent, req.user?._id);
+    const broadcastEvent = { ...eventResp, isRegistered: undefined, myRegistration: undefined };
+    if (req.io) req.io.emit("updatePost", broadcastEvent);
     res.json(eventResp);
   } catch (error) {
     res.status(500).json({ error: "Server error" });
@@ -191,8 +219,9 @@ const replyToCommentOnEvent = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const eventResp = { ...updatedEvent.toObject(), user: updatedEvent.createdBy, type: "Event", content: updatedEvent.description };
-    if (req.io) req.io.emit("updatePost", eventResp);
+    const eventResp = await getEventMetadata(updatedEvent, req.user?._id);
+    const broadcastEvent = { ...eventResp, isRegistered: undefined, myRegistration: undefined };
+    if (req.io) req.io.emit("updatePost", broadcastEvent);
     res.status(201).json(eventResp);
   } catch (error) {
     res.status(500).json({ error: "Server error" });
@@ -235,8 +264,9 @@ const reactToCommentOnEvent = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const eventResp = { ...updatedEvent.toObject(), user: updatedEvent.createdBy, type: "Event", content: updatedEvent.description };
-    if (req.io) req.io.emit("updatePost", eventResp);
+    const eventResp = await getEventMetadata(updatedEvent, req.user?._id);
+    const broadcastEvent = { ...eventResp, isRegistered: undefined, myRegistration: undefined };
+    if (req.io) req.io.emit("updatePost", broadcastEvent);
     res.json(eventResp);
   } catch (error) {
     res.status(500).json({ error: "Server error" });
@@ -264,8 +294,9 @@ const editReplyOnEvent = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const eventResp = { ...updatedEvent.toObject(), user: updatedEvent.createdBy, type: "Event", content: updatedEvent.description };
-    if (req.io) req.io.emit("updatePost", eventResp);
+    const eventResp = await getEventMetadata(updatedEvent, req.user?._id);
+    const broadcastEvent = { ...eventResp, isRegistered: undefined, myRegistration: undefined };
+    if (req.io) req.io.emit("updatePost", broadcastEvent);
     res.json(eventResp);
   } catch (error) {
     res.status(500).json({ error: "Server error" });
@@ -289,8 +320,9 @@ const deleteReplyOnEvent = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const eventResp = { ...updatedEvent.toObject(), user: updatedEvent.createdBy, type: "Event", content: updatedEvent.description };
-    if (req.io) req.io.emit("updatePost", eventResp);
+    const eventResp = await getEventMetadata(updatedEvent, req.user?._id);
+    const broadcastEvent = { ...eventResp, isRegistered: undefined, myRegistration: undefined };
+    if (req.io) req.io.emit("updatePost", broadcastEvent);
     res.json(eventResp);
   } catch (error) {
     res.status(500).json({ error: "Server error" });
@@ -336,8 +368,9 @@ const reactToReplyOnEvent = async (req, res) => {
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" });
 
-    const eventResp = { ...updatedEvent.toObject(), user: updatedEvent.createdBy, type: "Event", content: updatedEvent.description };
-    if (req.io) req.io.emit("updatePost", eventResp);
+    const eventResp = await getEventMetadata(updatedEvent, req.user?._id);
+    const broadcastEvent = { ...eventResp, isRegistered: undefined, myRegistration: undefined };
+    if (req.io) req.io.emit("updatePost", broadcastEvent);
     res.json(eventResp);
   } catch (error) {
     res.status(500).json({ error: "Server error" });
