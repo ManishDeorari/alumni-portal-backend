@@ -32,7 +32,7 @@ const getPosts = async (req, res) => {
           const reg = await Registration.findOne({ eventId: e._id, userId: reqUserId });
           if (reg) {
             isRegistered = true;
-            myRegistration = reg.toObject ? reg.toObject() : reg;
+            myRegistration = reg.toObject({ flattenMaps: true });
           }
         }
         const ev = e.toObject ? e.toObject() : e;

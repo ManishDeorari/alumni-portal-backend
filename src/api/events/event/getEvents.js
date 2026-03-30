@@ -15,7 +15,7 @@ const getEvents = async (req, res) => {
         const reg = await Registration.findOne({ eventId: event._id, userId: req.user._id });
         if (reg) {
           isRegistered = true;
-          myRegistration = reg.toObject ? reg.toObject() : reg;
+          myRegistration = reg.toObject({ flattenMaps: true });
         }
       }
       const ev = event.toObject();
