@@ -13,7 +13,8 @@ const downloadCSV = async (req, res) => {
     if (!event) return res.status(404).json({ message: "Event not found" });
 
     const registrations = await Registration.find({ eventId })
-      .populate("userId", "name email enrollmentNumber");
+      .populate("userId", "name email enrollmentNumber")
+      .sort({ createdAt: 1 }); // Persistent order by entry time
 
     if (registrations.length === 0) {
       return res.status(404).json({ message: "No registrations found" });
@@ -23,7 +24,7 @@ const downloadCSV = async (req, res) => {
     const baseHeaders = baseFields.map(field => field.replace(/([A-Z])/g, ' $1').trim());
     
     // Core headers
-    let headers = [...baseHeaders];
+    let headers = ["Group Name", ...baseHeaders];
     
     // Identify if group tracking is needed
     if (event.allowGroupRegistration) {
@@ -36,10 +37,15 @@ const downloadCSV = async (req, res) => {
     event.customQuestions.forEach(q => headers.push(q.question));
 
     let csvContent = headers.map(h => `"${h}"`).join(",") + "\n";
+    let groupIndex = 1;
 
     registrations.forEach(reg => {
       const user = reg.userId || {};
+      const groupLabel = `Group ${groupIndex++}`;
       const row = [];
+
+      // Prepend Group Name
+      row.push(`"${groupLabel}"`);
 
       // 1. Team Lead Data 
       baseFields.forEach(field => {
@@ -68,6 +74,9 @@ const downloadCSV = async (req, res) => {
         reg.groupMembers.forEach(member => {
             const memberRow = [];
             
+            // Prepend Group Name (Persistent for the whole group)
+            memberRow.push(`"${groupLabel}"`);
+
             // Map member fields to matching baseFields 
             baseFields.forEach(field => {
                  const isPhone = field === "phoneNumber" || field === "mobileNumber";
@@ -93,9 +102,6 @@ const downloadCSV = async (req, res) => {
             csvContent += memberRow.join(",") + "\n";
         });
       }
-      
-      // Add an empty line to separate this registration block from the next
-      csvContent += "\n";
     });
 
     res.setHeader("Content-Type", "text/csv");

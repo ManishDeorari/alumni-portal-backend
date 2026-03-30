@@ -11,11 +11,17 @@ const getRegistrations = async (req, res) => {
 
     const registrations = await Registration.find({ eventId })
       .populate("userId", "name email profilePicture enrollmentNumber")
-      .sort({ registeredAt: -1 });
+      .sort({ createdAt: 1 });
 
     const totalCount = registrations.length;
+    
+    // Add stable group tracking labels
+    const processedRegistrations = registrations.map((reg, idx) => ({
+      ...reg.toObject({ flattenMaps: true }),
+      groupName: `Group ${idx + 1}`
+    }));
 
-    res.json({ totalCount, registrations });
+    res.json({ totalCount, registrations: processedRegistrations });
   } catch (error) {
     console.error("Get registrations error:", error);
     res.status(500).json({ message: "Error fetching registrations" });
