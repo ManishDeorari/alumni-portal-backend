@@ -1,5 +1,4 @@
 const Event = require("../../../../models/Event");
-const socket = require("../../../../utils/socket");
 
 const reactToEvent = async (req, res) => {
   try {
