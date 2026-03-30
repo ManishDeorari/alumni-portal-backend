@@ -1,6 +1,4 @@
 const Post = require("../../../../models/Post");
-const Event = require("../../../../models/Event");
-const Registration = require("../../../../models/Registration");
 
 const commentPost = async (req, res) => {
   try {
@@ -14,55 +12,26 @@ const commentPost = async (req, res) => {
       createdAt: new Date(),
     };
 
-    // Add comment to post or event
-    let post = await Post.findById(postId);
-    let isEvent = false;
-
-    if (!post) {
-      post = await Event.findById(postId);
-      if (post) isEvent = true;
-    }
-
-    if (!post) return res.status(404).json({ message: "Post/Event not found" });
-
+    // Add comment to post
+    const post = await Post.findById(postId);
     post.comments.push(comment);
     await post.save();
 
-    let updatedPost;
-    let plainPost;
-
-    if (isEvent) {
-      updatedPost = await Event.findById(postId)
-        .populate("createdBy", "name profilePicture")
-        .populate("comments.user", "name profilePicture")
-        .populate("comments.replies.user", "name profilePicture");
-
-      plainPost = updatedPost.toJSON();
-      plainPost.user = plainPost.createdBy;
-      plainPost.type = "Event";
-      plainPost.content = plainPost.description;
-      const regCount = await Registration.countDocuments({ eventId: postId });
-      plainPost.registrationCount = regCount;
-    } else {
-      updatedPost = await Post.findById(postId)
-        .populate("user", "name profilePicture")
-        .populate("comments.user", "name profilePicture")
-        .populate("comments.replies.user", "name profilePicture");
-      plainPost = updatedPost.toJSON();
-    }
+    // Repopulate with full user details
+    const updatedPost = await Post.findById(postId)
+      .populate("user", "name profilePicture")
+      .populate("comments.user", "name profilePicture")
+      .populate("comments.replies.user", "name profilePicture");
 
     // Emit socket update
-    if (req.io) {
-      req.io.emit("postUpdated", plainPost);
-    }
+    req.io.emit("postUpdated", updatedPost);
 
     // Trigger Notification if the commenter is not the post owner
-    const receiverId = isEvent ? updatedPost.createdBy._id : updatedPost.user._id;
-    if (userId.toString() !== receiverId.toString()) {
+    if (userId.toString() !== updatedPost.user._id.toString()) {
       const Notification = require("../../../../models/Notification");
       const newNotification = new Notification({
         sender: userId,
-        receiver: receiverId,
+        receiver: updatedPost.user._id,
         type: "post_comment",
         message: `${req.user.name} commented on your post: "${text.substring(0, 20)}${text.length > 20 ? "..." : ""}"`,
         postId: postId,
@@ -71,7 +40,7 @@ const commentPost = async (req, res) => {
 
       if (req.io) {
         const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-        req.io.to(receiverId.toString()).emit("newNotification", populatedNotification);
+        req.io.to(updatedPost.user._id.toString()).emit("newNotification", populatedNotification);
       }
     }
 
@@ -98,7 +67,7 @@ const commentPost = async (req, res) => {
     }
 
     // Return full updated post (✅ Only one response!)
-    res.status(201).json(plainPost);
+    res.status(201).json(updatedPost);
   } catch (error) {
     console.error("Comment error:", error.message);
     res.status(500).json({ message: "Failed to comment" });

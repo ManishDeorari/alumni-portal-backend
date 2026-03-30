@@ -1,6 +1,4 @@
 const Post = require("../../../../models/Post");
-const Event = require("../../../../models/Event");
-const Registration = require("../../../../models/Registration");
 
 module.exports = async (req, res) => {
   try {
@@ -8,14 +6,7 @@ module.exports = async (req, res) => {
     const { emoji } = req.body;
     const userId = req.user._id.toString();
 
-    let post = await Post.findById(id);
-    let isEvent = false;
-
-    if (!post) {
-      post = await Event.findById(id);
-      if (post) isEvent = true;
-    }
-
+    const post = await Post.findById(id);
     if (!post) return res.status(404).json({ error: "Post not found" });
 
     if (!(post.reactions instanceof Map)) {
@@ -41,38 +32,17 @@ module.exports = async (req, res) => {
 
     await post.save();
 
-    let updatedPost;
-    let plainPost;
+    const updatedPost = await Post.findById(post._id)
+      .populate({ path: "user", select: "name profilePicture" })
+      .populate({
+        path: "comments",
+        populate: [
+          { path: "user", select: "name profilePicture" },
+          { path: "replies.user", select: "name profilePicture" },
+        ],
+      });
 
-    if (isEvent) {
-      updatedPost = await Event.findById(post._id)
-        .populate({ path: "createdBy", select: "name profilePicture" })
-        .populate({
-          path: "comments",
-          populate: [
-            { path: "user", select: "name profilePicture" },
-            { path: "replies.user", select: "name profilePicture" },
-          ],
-        });
-      
-      plainPost = updatedPost.toJSON();
-      plainPost.user = plainPost.createdBy;
-      plainPost.type = "Event";
-      plainPost.content = plainPost.description;
-      const regCount = await Registration.countDocuments({ eventId: post._id });
-      plainPost.registrationCount = regCount;
-    } else {
-      updatedPost = await Post.findById(post._id)
-        .populate({ path: "user", select: "name profilePicture" })
-        .populate({
-          path: "comments",
-          populate: [
-            { path: "user", select: "name profilePicture" },
-            { path: "replies.user", select: "name profilePicture" },
-          ],
-        });
-      plainPost = updatedPost.toJSON();
-    }
+    const plainPost = updatedPost.toJSON();
 
     if (req.io) {
       req.io.emit("postReacted", plainPost);
@@ -101,12 +71,11 @@ module.exports = async (req, res) => {
     }
 
     // Trigger Notification if the reactor is not the post owner
-    const receiverId = isEvent ? updatedPost.createdBy._id : updatedPost.user._id;
-    if (userId !== receiverId.toString()) {
+    if (userId !== updatedPost.user._id.toString()) {
       const Notification = require("../../../../models/Notification");
       const newNotification = new Notification({
         sender: userId,
-        receiver: receiverId,
+        receiver: updatedPost.user._id,
         type: "post_like",
         message: `${req.user.name} reacted with ${emoji} to your post`,
         postId: id,
@@ -115,7 +84,7 @@ module.exports = async (req, res) => {
 
       if (req.io) {
         const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-        req.io.to(receiverId.toString()).emit("newNotification", populatedNotification);
+        req.io.to(updatedPost.user._id.toString()).emit("newNotification", populatedNotification);
       }
     }
 

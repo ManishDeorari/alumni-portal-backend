@@ -21,9 +21,7 @@ const getPosts = async (req, res) => {
         
       let eventFilter = userId ? { createdBy: userId } : {};
       const events = await Event.find(eventFilter)
-        .populate("createdBy", "name profilePicture")
-        .populate({ path: "comments.user", select: "name profilePicture" })
-        .populate({ path: "comments.replies.user", select: "name profilePicture" });
+        .populate("createdBy", "name profilePicture");
         
       const mappedEvents = await Promise.all(events.map(async (e) => {
         const regCount = await Registration.countDocuments({ eventId: e._id });
@@ -37,18 +35,8 @@ const getPosts = async (req, res) => {
             myRegistration = reg.toObject({ flattenMaps: true });
           }
         }
-        const ev = e.toJSON ? e.toJSON() : (e.toObject ? e.toObject() : e);
-        return { 
-          ...ev, 
-          content: ev.description, 
-          user: ev.createdBy, 
-          type: "Event", 
-          registrationCount: regCount, 
-          isRegistered, 
-          myRegistration,
-          comments: ev.comments || [],
-          reactions: ev.reactions || {}
-        };
+        const ev = e.toObject ? e.toObject() : e;
+        return { ...ev, content: ev.description, user: ev.createdBy, type: "Event", registrationCount: regCount, isRegistered, myRegistration };
       }));
       
       const allContent = [...posts, ...mappedEvents].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
