@@ -5,6 +5,8 @@ const getEvents = async (req, res) => {
   try {
     const events = await Event.find()
       .populate("createdBy", "name profilePicture")
+      .populate({ path: "comments.user", select: "name profilePicture" })
+      .populate({ path: "comments.replies.user", select: "name profilePicture" })
       .sort({ createdAt: -1 });
 
     const eventsWithCounts = await Promise.all(events.map(async (event) => {
@@ -18,7 +20,8 @@ const getEvents = async (req, res) => {
           myRegistration = reg.toObject({ flattenMaps: true });
         }
       }
-      const ev = event.toObject();
+      // Use toJSON() to ensure reactions (Maps) are converted to plain objects
+      const ev = event.toJSON();
       return { ...ev, content: ev.description, user: ev.createdBy, type: "Event", registrationCount, isRegistered, myRegistration };
     }));
 
@@ -31,7 +34,10 @@ const getEvents = async (req, res) => {
 
 const getEventById = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).populate("createdBy", "name profilePicture");
+    const event = await Event.findById(req.params.id)
+      .populate("createdBy", "name profilePicture")
+      .populate({ path: "comments.user", select: "name profilePicture" })
+      .populate({ path: "comments.replies.user", select: "name profilePicture" });
     if (!event) return res.status(404).json({ message: "Event not found" });
 
     const registrationCount = await Registration.countDocuments({ eventId: event._id });
@@ -43,11 +49,11 @@ const getEventById = async (req, res) => {
       const registration = await Registration.findOne({ eventId: event._id, userId: req.user._id || req.user.id });
       if (registration) {
         isRegistered = true;
-        myRegistration = registration.toObject ? registration.toObject() : registration;
+        myRegistration = registration.toObject ? registration.toObject({ flattenMaps: true }) : registration;
       }
     }
 
-    const ev = event.toObject();
+    const ev = event.toJSON();
     res.json({ ...ev, content: ev.description, user: ev.createdBy, type: "Event", registrationCount, isRegistered, myRegistration });
   } catch (error) {
     res.status(500).json({ message: "Error fetching event" });

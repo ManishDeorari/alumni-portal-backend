@@ -20,6 +20,9 @@ const commentSchema = new mongoose.Schema({
     },
     parentId: { type: mongoose.Schema.Types.ObjectId, ref: "Comment" },
   }],
+}, { 
+  toObject: { flattenMaps: true },
+  toJSON: { flattenMaps: true }
 });
 
 const EventSchema = new mongoose.Schema({
@@ -67,7 +70,11 @@ const EventSchema = new mongoose.Schema({
     default: () => new Map(),
   },
   comments: [commentSchema],
-}, { timestamps: true });
+}, { 
+  timestamps: true,
+  toObject: { flattenMaps: true },
+  toJSON: { flattenMaps: true }
+});
 
 // Normalize reactions before saving
 const emojiRegex = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Extended_Pictographic})$/u;
@@ -84,30 +91,5 @@ EventSchema.pre("save", function (next) {
   }
   next();
 });
-
-// Serialize Maps as plain objects
-EventSchema.methods.toJSON = function () {
-  const obj = this.toObject();
-  if (obj.reactions instanceof Map) {
-    obj.reactions = Object.fromEntries(obj.reactions);
-  }
-  if (obj.comments?.length) {
-    obj.comments = obj.comments.map((c) => {
-      if (c.reactions instanceof Map) {
-        c.reactions = Object.fromEntries(c.reactions);
-      }
-      if (Array.isArray(c.replies)) {
-        c.replies = c.replies.map((r) => {
-          if (r.reactions instanceof Map) {
-            r.reactions = Object.fromEntries(r.reactions);
-          }
-          return r;
-        });
-      }
-      return c;
-    });
-  }
-  return obj;
-};
 
 module.exports = mongoose.models.Event || mongoose.model("Event", EventSchema);
