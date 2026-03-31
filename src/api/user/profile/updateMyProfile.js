@@ -46,9 +46,9 @@ module.exports = async (req, res) => {
         const formattedCourse = edu.course ? String(edu.course).toUpperCase() : "";
         let courseYearKey = null;
         
-        if (formattedCourse && startYear && !isNaN(startYear)) {
-          // e.g. MCA_2023
-          courseYearKey = `${formattedCourse}_${startYear}`.toUpperCase();
+        if (formattedCourse && endYear && !isNaN(endYear)) {
+          // e.g. MCA_2026
+          courseYearKey = `${formattedCourse}_${endYear}`.toUpperCase();
         }
 
         return {

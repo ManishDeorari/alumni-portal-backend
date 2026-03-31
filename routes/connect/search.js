@@ -46,7 +46,7 @@ router.get("/", authMiddleware, async (req, res) => {
     } else if (year) {
       conditions.push({
         $or: [
-          { "education.startYear": Number(year) },
+          { "education.endYear": Number(year) },
           { year: String(year) }
         ]
       });

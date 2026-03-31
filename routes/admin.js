@@ -267,7 +267,7 @@ router.get("/export-alumni", authenticate, verifyAdmin, async (req, res) => {
     } else if (year) {
       conditions.push({
         $or: [
-          { "education.startYear": Number(year) },
+          { "education.endYear": Number(year) },
           { year: String(year) }
         ]
       });
