@@ -103,8 +103,7 @@ module.exports = async (req, res) => {
         (updatedUser.jobPreferences.functionalArea || updatedUser.jobPreferences.preferredLocations?.length > 0);
 
       const isCompleted = hasProfilePic && hasBanner && hasPhone && hasAddress &&
-        hasWhatsApp && hasLinkedIn && hasBio && hasEducation &&
-        hasExperience;
+        hasWhatsApp && hasLinkedIn && hasBio && hasEducation;
 
       if (isCompleted) {
         if (!updatedUser.points) updatedUser.points = { total: 0 };
