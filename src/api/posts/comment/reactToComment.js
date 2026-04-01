@@ -19,19 +19,18 @@ const reactToComment = async (req, res) => {
       comment.reactions = new Map(Object.entries(comment.reactions || {}));
     }
 
-    let userAlreadyReacted = false;
-
+    let wasInAnyBucket = false;
+    let isSameEmoji = false;
     for (const [key, users] of comment.reactions.entries()) {
       const filtered = users.filter((id) => id.toString() !== userId);
-
-      if (key === emoji && filtered.length !== users.length) {
-        userAlreadyReacted = true;
+      if (filtered.length !== users.length) {
+        wasInAnyBucket = true;
+        if (key === emoji) isSameEmoji = true;
       }
-
       comment.reactions.set(key, filtered);
     }
 
-    if (!userAlreadyReacted) {
+    if (!isSameEmoji) {
       const current = comment.reactions.get(emoji) || [];
       comment.reactions.set(emoji, [...current, userId]);
     }
@@ -39,23 +38,45 @@ const reactToComment = async (req, res) => {
     post.markModified("comments");
     await post.save();
 
-    console.log("💾 Post saved successfully");
-
-    // 🔔 Send notification to comment owner BEFORE fetching updated post
-    // Get the comment owner ID (could be populated object or ObjectId)
     const commentOwnerId = comment.user?._id ? comment.user._id.toString() : comment.user.toString();
 
-    console.log("🔍 Comment Reaction Debug:", {
-      userAlreadyReacted,
-      commentOwnerId,
-      currentUserId: userId,
-      shouldSendNotification: !userAlreadyReacted && commentOwnerId !== userId,
-      commentUser: comment.user,
-      emoji
-    });
+    // ✅ Award Points Logic (Initial reaction only)
+    if (!wasInAnyBucket && !isSameEmoji && req.user.role === "alumni") {
+      try {
+        const User = require("../../../../models/User");
+        const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
+        const user = await User.findById(userId);
+        const config = (await PointsSystemConfig.findOne()) || { likePoints: 2 };
 
-    if (!userAlreadyReacted && commentOwnerId !== userId) {
-      console.log("📝 Creating notification...");
+        if (!user.points) user.points = { total: 0 };
+        const pts = config.likePoints || 2;
+
+        user.points.total = (user.points.total || 0) + pts;
+        user.points.likes = (user.points.likes || 0) + pts;
+        user.points.studentEngagement = (user.points.studentEngagement || 0) + pts;
+
+        await user.save();
+
+        const Notification = require("../../../../models/Notification");
+        const pointsNotification = new Notification({
+          sender: user._id,
+          receiver: user._id,
+          type: "points_earned",
+          message: `You earned ${pts} points by Like.`,
+        });
+        await pointsNotification.save();
+
+        if (req.io) {
+          const populatedNote = await Notification.findById(pointsNotification._id).populate("sender", "name profilePicture");
+          req.io.to(user._id.toString()).emit("newNotification", populatedNote);
+        }
+      } catch (awardErr) {
+        console.error("❌ Failed to award points for comment reaction:", awardErr.message);
+      }
+    }
+
+    // Trigger Notification for the comment owner
+    if (!isSameEmoji && commentOwnerId !== userId) {
       const Notification = require("../../../../models/Notification");
       const newNotification = new Notification({
         sender: userId,
@@ -67,14 +88,9 @@ const reactToComment = async (req, res) => {
       });
       await newNotification.save();
 
-      console.log("✅ Notification saved:", newNotification._id);
-
       if (req.io) {
         const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
         req.io.to(commentOwnerId).emit("newNotification", populatedNotification);
-        console.log("📡 WebSocket emitted to room:", commentOwnerId);
-      } else {
-        console.log("❌ req.io is not available!");
       }
     }
 

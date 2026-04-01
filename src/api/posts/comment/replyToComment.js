@@ -31,6 +31,41 @@ const replyToComment = async (req, res) => {
 
     req.io.emit("postUpdated", updated);
 
+    // ✅ Award Points Logic
+    if (req.user.role === "alumni") {
+      try {
+        const User = require("../../../../models/User");
+        const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
+        const user = await User.findById(req.user._id);
+        const config = (await PointsSystemConfig.findOne()) || { commentPoints: 3 };
+
+        if (!user.points) user.points = { total: 0 };
+        const pts = config.commentPoints || 3;
+
+        user.points.total = (user.points.total || 0) + pts;
+        user.points.comments = (user.points.comments || 0) + pts;
+        user.points.contentContribution = (user.points.contentContribution || 0) + pts;
+
+        await user.save();
+
+        const Notification = require("../../../../models/Notification");
+        const pointsNotification = new Notification({
+          sender: user._id,
+          receiver: user._id,
+          type: "points_earned",
+          message: `You earned ${pts} points by Comment.`, // Using 'Comment' for consistency with comment points
+        });
+        await pointsNotification.save();
+
+        if (req.io) {
+          const populatedNote = await Notification.findById(pointsNotification._id).populate("sender", "name profilePicture");
+          req.io.to(user._id.toString()).emit("newNotification", populatedNote);
+        }
+      } catch (awardErr) {
+        console.error("❌ Failed to award points for reply:", awardErr.message);
+      }
+    }
+
     // Trigger Notification for the comment owner (if the replier is not the comment owner)
     if (req.user._id.toString() !== comment.user.toString()) {
       const Notification = require("../../../../models/Notification");

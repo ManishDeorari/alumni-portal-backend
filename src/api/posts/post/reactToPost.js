@@ -13,21 +13,20 @@ module.exports = async (req, res) => {
       post.reactions = new Map(Object.entries(post.reactions || {}));
     }
 
-    let userAlreadyReacted = false;
-
+    let wasInAnyBucket = false;
+    let isSameEmoji = false;
     for (const [key, users] of post.reactions.entries()) {
       const filtered = users.filter(id => id.toString() !== userId);
-      if (key === emoji && filtered.length !== users.length) {
-        userAlreadyReacted = true;
+      if (filtered.length !== users.length) {
+        wasInAnyBucket = true;
+        if (key === emoji) isSameEmoji = true;
       }
       post.reactions.set(key, filtered);
     }
 
-    if (!userAlreadyReacted) {
+    if (!isSameEmoji) {
       const current = post.reactions.get(emoji) || [];
-      if (!current.includes(userId)) {
-        post.reactions.set(emoji, [...current, userId]);
-      }
+      post.reactions.set(emoji, [...current, userId]);
     }
 
     await post.save();
@@ -48,8 +47,8 @@ module.exports = async (req, res) => {
       req.io.emit("postReacted", plainPost);
     }
 
-    // ✅ Award Points Logic (if it's a NEW reaction)
-    if (!userAlreadyReacted && req.user.role === "alumni") {
+    // ✅ Award Points Logic (Initial reaction only, to avoid farming on switches)
+    if (!wasInAnyBucket && !isSameEmoji && req.user.role === "alumni") {
       try {
         const User = require("../../../../models/User");
         const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
@@ -90,8 +89,8 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Trigger Notification if the reactor is not the post owner
-    if (userId !== updatedPost.user._id.toString()) {
+    // Trigger Notification for the post owner (Only if it's NOT a toggle off AND not the owner)
+    if (!isSameEmoji && userId !== updatedPost.user._id.toString()) {
       const Notification = require("../../../../models/Notification");
       const newNotification = new Notification({
         sender: userId,

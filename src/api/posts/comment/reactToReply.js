@@ -26,18 +26,18 @@ const reactToReply = async (req, res) => {
       reply.reactions = new Map(Object.entries(reply.reactions || {}));
     }
 
-    // Remove existing reaction by user
-    let userAlreadyReacted = false;
+    let wasInAnyBucket = false;
+    let isSameEmoji = false;
     for (const [key, users] of reply.reactions.entries()) {
       const filtered = users.filter((id) => id.toString() !== userId);
-      if (key === emoji && filtered.length !== users.length) {
-        userAlreadyReacted = true;
+      if (filtered.length !== users.length) {
+        wasInAnyBucket = true;
+        if (key === emoji) isSameEmoji = true;
       }
       reply.reactions.set(key, filtered);
     }
 
-    // Add new reaction if not already reacted
-    if (!userAlreadyReacted) {
+    if (!isSameEmoji) {
       const current = reply.reactions.get(emoji) || [];
       reply.reactions.set(emoji, [...current, userId]);
     }
@@ -45,11 +45,45 @@ const reactToReply = async (req, res) => {
     post.markModified("comments");
     await post.save();
 
-    // 🔔 Send notification to reply owner BEFORE fetching updated post
-    // Get the reply owner ID (could be populated object or ObjectId)
     const replyOwnerId = reply.user?._id ? reply.user._id.toString() : reply.user.toString();
 
-    if (!userAlreadyReacted && replyOwnerId !== userId) {
+    // ✅ Award Points Logic (Initial reaction only)
+    if (!wasInAnyBucket && !isSameEmoji && req.user.role === "alumni") {
+      try {
+        const User = require("../../../../models/User");
+        const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
+        const user = await User.findById(userId);
+        const config = (await PointsSystemConfig.findOne()) || { likePoints: 2 };
+
+        if (!user.points) user.points = { total: 0 };
+        const pts = config.likePoints || 2;
+
+        user.points.total = (user.points.total || 0) + pts;
+        user.points.likes = (user.points.likes || 0) + pts;
+        user.points.studentEngagement = (user.points.studentEngagement || 0) + pts;
+
+        await user.save();
+
+        const Notification = require("../../../../models/Notification");
+        const pointsNotification = new Notification({
+          sender: user._id,
+          receiver: user._id,
+          type: "points_earned",
+          message: `You earned ${pts} points by Like.`,
+        });
+        await pointsNotification.save();
+
+        if (req.io) {
+          const populatedNote = await Notification.findById(pointsNotification._id).populate("sender", "name profilePicture");
+          req.io.to(user._id.toString()).emit("newNotification", populatedNote);
+        }
+      } catch (awardErr) {
+        console.error("❌ Failed to award points for reply reaction:", awardErr.message);
+      }
+    }
+
+    // Trigger Notification for the reply owner
+    if (!isSameEmoji && replyOwnerId !== userId) {
       const Notification = require("../../../../models/Notification");
       const newNotification = new Notification({
         sender: userId,
