@@ -99,7 +99,7 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
                 sender: req.user._id,
                 receiver: user._id,
                 type: "points_earned",
-                message: `"${message || "Points Awarded"}" Category: ${category} Points: ${amount}`,
+                message: `MANUAL_AWARD::${message || "Points Awarded"}::${category}::${amount}`,
             });
             await newNotification.save();
 
