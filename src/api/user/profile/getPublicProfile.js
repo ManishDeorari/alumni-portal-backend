@@ -2,12 +2,23 @@ const User = require("../../../../models/User");
 
 module.exports = async (req, res) => {
   try {
-    const targetUserId = req.params.id;
+    const reqParamId = req.params.id;
     const visitorId = req.user?.id;
+    const mongoose = require("mongoose");
 
-    const user = await User.findById(targetUserId).select("-password");
+    let user;
+    if (mongoose.isValidObjectId(reqParamId)) {
+      user = await User.findOne({ 
+          $or: [{ _id: reqParamId }, { publicId: reqParamId }] 
+      }).select("-password");
+    } else {
+      user = await User.findOne({ publicId: reqParamId }).select("-password");
+    }
 
     if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Assign the definitive object ID for internal relationship queries down the chain
+    const targetUserId = user._id;
 
     // 🚀 Visit Tracking Logic
     if (visitorId && visitorId.toString() !== targetUserId.toString()) {
