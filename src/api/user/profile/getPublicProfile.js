@@ -12,72 +12,74 @@ module.exports = async (req, res) => {
     // 🚀 Visit Tracking Logic
     if (visitorId && visitorId.toString() !== targetUserId.toString()) {
       const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const todayStr = now.toISOString().split("T")[0];
-      const yearStr = now.getFullYear().toString();
+      
+      const getISTDateStr = (date) => {
+        if (!date) return "";
+        return new Intl.DateTimeFormat('en-GB', { 
+            timeZone: 'Asia/Kolkata', 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit' 
+        }).format(date); // Outputs: "DD/MM/YYYY"
+      };
 
-      const isDifferentDay = !user.visitStats.lastResetTodayVisitsAt || 
-                             new Date(user.visitStats.lastResetTodayVisitsAt) < today;
+      const todayStrIST = getISTDateStr(now);
+      const yearStrIST = todayStrIST.slice(-4);
 
-      if (isDifferentDay) {
-        user.visitStats.todayVisits = 0;
-        user.visitStats.lastResetTodayVisitsAt = now;
-      }
-
-      // Ensure visitStats exists
       if (!user.visitStats) {
-        user.visitStats = { totalVisits: 0, todayVisits: 0 };
+        user.visitStats = { totalVisits: 0, todayVisits: 0, lastResetTodayVisitsAt: new Date(0) };
       }
       if (!user.visitors) {
         user.visitors = [];
       }
 
-      // Find if this visitor has been here before
+      let profileUpdated = false;
+
+      // 1. Daily Profile Counter Reset Check (IST)
+      const lastResetStrIST = getISTDateStr(new Date(user.visitStats.lastResetTodayVisitsAt || 0));
+      if (lastResetStrIST !== todayStrIST) {
+        user.visitStats.todayVisits = 0;
+        user.visitStats.lastResetTodayVisitsAt = now;
+        profileUpdated = true;
+      }
+
+      // 2. Process Visitor Action
       const visitorRecord = user.visitors.find(v => v.user && v.user.toString() === visitorId.toString());
 
       if (visitorRecord) {
-        const lastVisit = new Date(visitorRecord.lastVisit);
-        const lastVisitDay = lastVisit.toISOString().split("T")[0];
-        const lastVisitYear = lastVisit.getFullYear().toString();
+        const lastVisitStrIST = getISTDateStr(new Date(visitorRecord.lastVisit));
+        const lastVisitYearIST = lastVisitStrIST.slice(-4);
 
-        let updated = false;
-
-        // Is it a new day?
-        if (lastVisitDay !== todayStr) {
+        // If they haven't visited TODAY (IST), increment today's views
+        if (lastVisitStrIST !== todayStrIST) {
           user.visitStats.todayVisits += 1;
-          updated = true;
+          profileUpdated = true;
         }
 
-        // Is it a new year?
-        if (lastVisitYear !== yearStr) {
+        // If they haven't visited this YEAR (IST), increment total views
+        if (lastVisitYearIST !== yearStrIST) {
           user.visitStats.totalVisits += 1;
-          updated = true;
+          profileUpdated = true;
         }
 
-        if (updated) {
+        if (profileUpdated) {
           visitorRecord.lastVisit = now;
-          await User.updateOne(
-            { _id: targetUserId, "visitors.user": visitorId },
-            {
-              $set: {
-                "visitors.$.lastVisit": now,
-                "visitStats.todayVisits": user.visitStats.todayVisits,
-                "visitStats.totalVisits": user.visitStats.totalVisits,
-                "visitStats.lastResetTodayVisitsAt": user.visitStats.lastResetTodayVisitsAt
-              }
-            }
-          );
         }
       } else {
-        // First time visitor ever
+        // Brand new visitor to this profile
         user.visitStats.todayVisits += 1;
         user.visitStats.totalVisits += 1;
         user.visitors.push({ user: visitorId, lastVisit: now });
+        profileUpdated = true;
+      }
 
+      if (profileUpdated) {
+        user.markModified("visitStats");
+        user.markModified("visitors");
         await user.save();
       }
 
-      // 🔔 Send Notification for EVERY visit (as requested)
+      // 🔔 Send Notification for EVERY visit (as requested by user config)
       await sendVisitNotification(req, visitorId, targetUserId);
     }
 

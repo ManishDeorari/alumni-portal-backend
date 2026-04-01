@@ -37,9 +37,28 @@ router.post("/signup", async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Generate publicId
+    const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    let publicId = baseSlug;
+    
+    // In extremely rare cases (less than 1%) where the generated slug isn't unique, loop it until it is perfectly unique.
+    let isUnique = false;
+    let counter = 1;
+    while (!isUnique) {
+      const existing = await User.findOne({ publicId });
+      if (existing) {
+        // Fallback: append random numbers or index, e.g. "manish-deorari-1", "-2"
+        publicId = `${baseSlug}-${counter}`;
+        counter++;
+      } else {
+        isUnique = true;
+      }
+    }
+
     // Create new user
     const newUser = new User({
       name,
+      publicId,
       email,
       password: hashedPassword,
       role,

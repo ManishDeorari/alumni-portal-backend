@@ -85,6 +85,7 @@ const UserSchema = new mongoose.Schema(
   {
     // Basic info
     name: { type: String, required: true },
+    publicId: { type: String, unique: true, sparse: true, index: true },
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
 
