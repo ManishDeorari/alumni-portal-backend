@@ -74,10 +74,28 @@ router.post("/", authenticate, async (req, res) => {
         user.points.connections += pointsToAdd;
 
         // Also keep studentEngagement if it's considered part of it, but user wants granular.
-        if (user.points.studentEngagement === undefined) user.points.studentEngagement = 0;
         user.points.studentEngagement += pointsToAdd;
 
         await user.save();
+
+        // ✅ Notification for points
+        try {
+          const Notification = require("../../models/Notification");
+          const newNotification = new Notification({
+            sender: user._id,
+            receiver: user._id,
+            type: "points_earned",
+            message: `You earned ${pointsToAdd} points by Networking.`,
+          });
+          await newNotification.save();
+
+          if (req.io) {
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+            req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
+          }
+        } catch (noteErr) {
+          console.error("❌ Failed to send networking award notice:", noteErr.message);
+        }
       }
     };
 

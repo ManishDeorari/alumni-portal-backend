@@ -21,7 +21,8 @@ const NotificationSchema = new mongoose.Schema({
       "group_joined",
       "group_added",
       "group_removed",
-      "group_disbanded"
+      "group_disbanded",
+      "points_earned"
     ]
   },
   groupId: { type: mongoose.Schema.Types.ObjectId, ref: "Group" },

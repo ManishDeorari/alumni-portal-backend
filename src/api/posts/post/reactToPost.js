@@ -64,6 +64,26 @@ module.exports = async (req, res) => {
         user.points.studentEngagement = (user.points.studentEngagement || 0) + pts;
 
         await user.save();
+
+        // ✅ Notification for points
+        try {
+          const Notification = require("../../../../models/Notification");
+          const newNotification = new Notification({
+            sender: user._id,
+            receiver: user._id,
+            type: "points_earned",
+            message: `You earned ${pts} points by Like.`,
+          });
+          await newNotification.save();
+
+          if (req.io) {
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+            req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
+          }
+        } catch (noteErr) {
+          console.error("❌ Failed to send reaction award notice:", noteErr.message);
+        }
+
         console.log(`✅ Awarded ${pts} points to user ${user.name} for reacting.`);
       } catch (awardErr) {
         console.error("❌ Failed to award points for reaction:", awardErr.message);

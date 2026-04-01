@@ -114,6 +114,26 @@ module.exports = async (req, res) => {
 
         updatedUser.profileCompletionAwarded = true;
         await updatedUser.save();
+
+        // ✅ Notification for points
+        try {
+          const Notification = require("../../../../models/Notification");
+          const newNotification = new Notification({
+            sender: updatedUser._id, // User is the sender (UI will handle "System" label)
+            receiver: updatedUser._id,
+            type: "points_earned",
+            message: `You earned ${awardAmount} points by Profile completion.`,
+          });
+          await newNotification.save();
+
+          if (req.io) {
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+            req.io.to(updatedUser._id.toString()).emit("newNotification", populatedNotification);
+          }
+        } catch (noteErr) {
+          console.error("❌ Failed to send profile completion award notice:", noteErr.message);
+        }
+
         console.log(`✅ Awarded ${awardAmount} points to user ${updatedUser.name} for FULL profile completion.`);
       }
     }

@@ -71,6 +71,26 @@ const createPost = async (req, res) => {
           user.postPointLogs.push(now);
 
           await user.save();
+
+          // ✅ Notification for points
+          try {
+            const Notification = require("../../../../models/Notification");
+            const newNotification = new Notification({
+              sender: user._id,
+              receiver: user._id,
+              type: "points_earned",
+              message: `You earned ${config.postPoints || 10} points by Posting.`,
+            });
+            await newNotification.save();
+
+            if (req.io) {
+              const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+              req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
+            }
+          } catch (noteErr) {
+            console.error("❌ Failed to send post placement award notice:", noteErr.message);
+          }
+
           console.log(`✅ Awarded ${config.postPoints} points to user ${user.name} for posting.`);
         } else {
           console.log(`ℹ️ Post limit reached for user ${user.name}, no points awarded.`);

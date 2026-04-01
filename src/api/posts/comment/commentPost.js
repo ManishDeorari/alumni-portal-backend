@@ -60,6 +60,26 @@ const commentPost = async (req, res) => {
         user.points.contentContribution = (user.points.contentContribution || 0) + pts;
 
         await user.save();
+
+        // ✅ Notification for points
+        try {
+          const Notification = require("../../../../models/Notification");
+          const newNotification = new Notification({
+            sender: user._id,
+            receiver: user._id,
+            type: "points_earned",
+            message: `You earned ${pts} points by Comment.`,
+          });
+          await newNotification.save();
+
+          if (req.io) {
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+            req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
+          }
+        } catch (noteErr) {
+          console.error("❌ Failed to send comment award notice:", noteErr.message);
+        }
+
         console.log(`✅ Awarded ${pts} points to user ${user.name} for commenting.`);
       } catch (awardErr) {
         console.error("❌ Failed to award points for comment:", awardErr.message);

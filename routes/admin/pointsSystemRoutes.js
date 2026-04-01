@@ -98,8 +98,8 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
             const newNotification = new Notification({
                 sender: req.user._id,
                 receiver: user._id,
-                type: "admin_notice",
-                message: message || `You have been awarded ${amount} points for ${category.replace(/([A-Z])/g, ' $1').toLowerCase()}.`,
+                type: "points_earned",
+                message: `"${message || "Points Awarded"}" Category: ${category} Points: ${amount}`,
             });
             await newNotification.save();
 
