@@ -50,10 +50,24 @@ const getPosts = async (req, res) => {
 
     // === STANDARD FETCHING LOGIC ===
     let filter = {};
+    const { subtype, search } = req.query;
+
     if (type === "Regular") {
       filter = { $or: [{ type: "Regular" }, { type: { $exists: false } }, { type: null }] };
     } else {
       filter = { type };
+    }
+
+    if (type === "Announcement") {
+      if (subtype === "winner") {
+        filter["announcementDetails.isWinnerAnnouncement"] = true;
+      }
+      if (search) {
+        filter["$or"] = [
+          { content: { $regex: search, $options: "i" } },
+          { "announcementDetails.winners.name": { $regex: search, $options: "i" } }
+        ];
+      }
     }
 
     if (userId) filter.user = userId;

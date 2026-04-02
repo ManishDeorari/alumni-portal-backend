@@ -52,6 +52,19 @@ const postSchema = new mongoose.Schema({
     enum: ["Regular", "Session", "Event", "Announcement"],
     default: "Regular",
   },
+  announcementDetails: {
+    isWinnerAnnouncement: { type: Boolean, default: false },
+    winners: [
+      {
+        name: String,
+        rank: String,
+        points: Number,
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      }
+    ],
+    pointsRequested: { type: Boolean, default: false },
+    pointsStatus: { type: String, enum: ["pending", "approved", "rejected", "none"], default: "none" },
+  }
 }, { timestamps: true });
 
 postSchema.index({ user: 1, createdAt: -1 });

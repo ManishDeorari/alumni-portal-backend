@@ -23,6 +23,7 @@ const createMainAdmin = require("./config/createMainAdmin");
 const yearRolloverRoute = require("./routes/admin/yearRollover");
 const rolloverConfigRoute = require("./routes/admin/rolloverConfig");
 const pointsSystemRoutes = require("./routes/admin/pointsSystemRoutes");
+const pointsRequestRoutes = require("./routes/pointsRequestRoutes");
 
 // ✅ NEW: Admin Dashboard routes
 const adminRoutes = require("./routes/admin");
@@ -150,6 +151,7 @@ app.use("/api/groups", require("./routes/groupRoutes")); // ✅ Group Routes
 app.use("/api/counts", countRoutes);
 app.use("/api/events", require("./routes/eventRoutes"));
 app.use("/api/registrations", require("./routes/registrationRoutes"));
+app.use("/api/points-requests", pointsRequestRoutes);
 
 // ✅ Global Error Handler
 app.use((err, req, res, next) => {

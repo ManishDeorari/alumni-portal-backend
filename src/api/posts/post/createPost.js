@@ -23,10 +23,32 @@ const createPost = async (req, res) => {
         finalType = "Session";
       } else if (type === "Event" && (userRole === "faculty" || isAdmin)) {
         finalType = "Event";
-      } else if (type === "Announcement" && isAdmin) {
+      } else if (type === "Announcement" && (userRole === "faculty" || isAdmin)) {
         finalType = "Announcement";
       } else {
         return res.status(403).json({ message: `You are not authorized to create a post of type ${type}` });
+      }
+    }
+
+    const { announcementDetails } = req.body;
+    let finalAnnouncementDetails = null;
+
+    if (finalType === "Announcement" && announcementDetails) {
+      finalAnnouncementDetails = {
+        isWinnerAnnouncement: announcementDetails.isWinnerAnnouncement || false,
+        winners: announcementDetails.winners || [],
+        pointsRequested: announcementDetails.pointsRequested || false,
+        pointsStatus: announcementDetails.pointsRequested ? "pending" : "none",
+      };
+
+      // Search for userId by name for winners
+      if (finalAnnouncementDetails.isWinnerAnnouncement && finalAnnouncementDetails.winners.length > 0) {
+        for (let winner of finalAnnouncementDetails.winners) {
+          const matchedUser = await User.findOne({ name: { $regex: new RegExp(`^${winner.name}$`, "i") } });
+          if (matchedUser) {
+            winner.userId = matchedUser._id;
+          }
+        }
       }
     }
 
@@ -36,6 +58,7 @@ const createPost = async (req, res) => {
       images: hasImages ? images : [],
       video: hasVideo ? video : null,
       type: finalType,
+      announcementDetails: finalAnnouncementDetails,
     });
 
     await post.save();
