@@ -9,6 +9,7 @@ const getPendingPointsRequests = async (req, res) => {
       "announcementDetails.pointsStatus": "pending"
     })
     .populate("user", "name profilePicture")
+    .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" })
     .sort({ createdAt: -1 });
 
     res.json(posts);
@@ -38,15 +39,23 @@ const approvePointsRequest = async (req, res) => {
       const awardResults = [];
 
       for (let winner of winners) {
-        if (winner.userId) {
-          const user = await User.findById(winner.userId);
+        // Collect all target user IDs for this winner row
+        const targetUserIds = [];
+        if (winner.isGroup && Array.isArray(winner.groupMembers)) {
+          targetUserIds.push(...winner.groupMembers);
+        } else if (winner.userId) {
+          targetUserIds.push(winner.userId);
+        }
+
+        for (let targetUserId of targetUserIds) {
+          const user = await User.findById(targetUserId);
           if (user) {
             const pointsToAward = parseInt(winner.points) || 0;
             
             if (!user.points) user.points = { total: 0 };
             user.points.total = (user.points.total || 0) + pointsToAward;
             
-            // Add to 'other' category as designated in the User model
+            // Add to 'other' category or specific announcement award category
             if (user.points.other === undefined) user.points.other = 0;
             user.points.other += pointsToAward;
 
@@ -61,17 +70,17 @@ const approvePointsRequest = async (req, res) => {
             });
             await newNotification.save();
 
-            // Socket emit if possible (handled in controller usually if io is passed)
+            // Socket emit
             if (req.io) {
               const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
               req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
             }
 
-            awardResults.push({ name: winner.name, status: "awarded", points: pointsToAward });
-          } else {
-            awardResults.push({ name: winner.name, status: "user_not_found" });
+            awardResults.push({ name: user.name, status: "awarded", points: pointsToAward });
           }
-        } else {
+        }
+        
+        if (targetUserIds.length === 0) {
           awardResults.push({ name: winner.name, status: "skipped_no_user_match" });
         }
       }

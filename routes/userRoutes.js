@@ -13,6 +13,7 @@ const {
   getAwardEligibleUsers,
   getMyPosts,
   getMyActivity,
+  searchUsers,
 } = require("../src/api/user/userController");
 
 // ------- PROFILE ROUTES -------
@@ -30,6 +31,7 @@ router.patch("/points/add", auth, addPoints);
 router.get("/award-eligible", auth, getAwardEligibleUsers);
 
 
+router.get("/search", auth, searchUsers);
 // ------- DYNAMIC ROUTES (MUST BE LAST) -------
 router.get("/:id", auth, getPublicProfile);
 

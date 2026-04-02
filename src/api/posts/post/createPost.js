@@ -41,12 +41,27 @@ const createPost = async (req, res) => {
         pointsStatus: announcementDetails.pointsRequested ? "pending" : "none",
       };
 
-      // Search for userId by name for winners
+      // Search for userId by name or uniqueId for winners
       if (finalAnnouncementDetails.isWinnerAnnouncement && finalAnnouncementDetails.winners.length > 0) {
         for (let winner of finalAnnouncementDetails.winners) {
-          const matchedUser = await User.findOne({ name: { $regex: new RegExp(`^${winner.name}$`, "i") } });
-          if (matchedUser) {
-            winner.userId = matchedUser._id;
+          // If a uniqueId is provided, use it primarily
+          if (winner.uniqueId) {
+            const matchedUser = await User.findOne({
+              $or: [
+                { publicId: winner.uniqueId },
+                { enrollmentNumber: winner.uniqueId }
+              ]
+            });
+            if (matchedUser) {
+              winner.userId = matchedUser._id;
+            }
+          } 
+          // Fallback to name search if no uniqueId or if user wasn't found by uniqueId
+          if (!winner.userId && winner.name) {
+            const matchedUser = await User.findOne({ name: { $regex: new RegExp(`^${winner.name}$`, "i") } });
+            if (matchedUser) {
+              winner.userId = matchedUser._id;
+            }
           }
         }
       }

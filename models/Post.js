@@ -60,6 +60,9 @@ const postSchema = new mongoose.Schema({
         rank: String,
         points: Number,
         userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        uniqueId: String, // PublicId or RegistrationNumber
+        isGroup: { type: Boolean, default: false },
+        groupMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       }
     ],
     pointsRequested: { type: Boolean, default: false },
