@@ -1,6 +1,6 @@
-const Post = require("../../../../models/Post");
-const User = require("../../../../models/User");
-const Notification = require("../../../../models/Notification");
+const Post = require("../../../models/Post");
+const User = require("../../../models/User");
+const Notification = require("../../../models/Notification");
 
 const getPendingPointsRequests = async (req, res) => {
   try {
@@ -46,9 +46,9 @@ const approvePointsRequest = async (req, res) => {
             if (!user.points) user.points = { total: 0 };
             user.points.total = (user.points.total || 0) + pointsToAward;
             
-            // Add to a generic category or create a new one for awards
-            if (user.points.awards === undefined) user.points.awards = 0;
-            user.points.awards += pointsToAward;
+            // Add to 'other' category as designated in the User model
+            if (user.points.other === undefined) user.points.other = 0;
+            user.points.other += pointsToAward;
 
             await user.save();
 

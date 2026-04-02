@@ -4,7 +4,9 @@ const auth = require("../middleware/authMiddleware");
 const { getPendingPointsRequests, approvePointsRequest } = require("../src/api/admin/pointsRequestController");
 
 const verifyAdmin = async (req, res, next) => {
-  if (req.user.role !== "admin") return res.status(403).json({ message: "Access denied. Admins only." });
+  if (!req.user || !req.user.isAdmin) {
+    return res.status(403).json({ message: "Access denied. Admins only." });
+  }
   next();
 };
 
