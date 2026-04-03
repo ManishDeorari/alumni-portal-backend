@@ -9,6 +9,7 @@ const getPendingPointsRequests = async (req, res) => {
       "announcementDetails.pointsStatus": "pending"
     })
     .populate("user", "name profilePicture")
+    .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId" })
     .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" })
     .sort({ createdAt: -1 });
 

@@ -18,6 +18,7 @@ const getPosts = async (req, res) => {
         .populate("user", "name profilePicture")
         .populate({ path: "comments.user", select: "name profilePicture" })
         .populate({ path: "comments.replies.user", select: "name profilePicture" })
+        .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId" })
         .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" });
         
       let eventFilter = userId ? { createdBy: userId } : {};
@@ -80,6 +81,7 @@ const getPosts = async (req, res) => {
       .populate("user", "name profilePicture")
       .populate({ path: "comments.user", select: "name profilePicture" })
       .populate({ path: "comments.replies.user", select: "name profilePicture" })
+      .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId" })
       .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" });
 
     const total = await Post.countDocuments(filter);
