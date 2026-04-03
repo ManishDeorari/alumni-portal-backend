@@ -39,9 +39,13 @@ const approvePointsRequest = async (req, res) => {
       const winners = post.announcementDetails.winners || [];
       const awardResults = [];
 
+      // Use the sender info for notifications
+      const senderInfo = { _id: req.user._id, name: req.user.name, profilePicture: req.user.profilePicture };
+
       for (let winner of winners) {
-        // Collect all target user IDs for this winner row
+        const pointsToAward = parseInt(winner.points) || 0;
         const targetUserIds = [];
+
         if (winner.isGroup && Array.isArray(winner.groupMembers)) {
           targetUserIds.push(...winner.groupMembers);
         } else if (winner.userId) {
@@ -51,8 +55,6 @@ const approvePointsRequest = async (req, res) => {
         for (let targetUserId of targetUserIds) {
           const user = await User.findById(targetUserId);
           if (user) {
-            const pointsToAward = parseInt(winner.points) || 0;
-            
             if (!user.points) user.points = { total: 0 };
             user.points.total = (user.points.total || 0) + pointsToAward;
             
@@ -62,7 +64,7 @@ const approvePointsRequest = async (req, res) => {
 
             await user.save();
 
-            // Create Notification with event details and post link
+            // Create Notification
             const eventName = post.announcementDetails?.eventName || "an event";
             const rank = winner.rank || "a winner";
 
@@ -75,10 +77,24 @@ const approvePointsRequest = async (req, res) => {
             });
             await newNotification.save();
 
-            // Socket emit
+            // Socket emits
             if (req.io) {
-              const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-              req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
+              const userRoom = user._id.toString();
+              
+              // 1. Live Notification with populated sender
+              const populatedNotification = {
+                ...newNotification.toObject(),
+                sender: senderInfo
+              };
+              req.io.to(userRoom).emit("newNotification", populatedNotification);
+
+              // 2. LIVE POINTS UPDATE - Key fix for the user's request
+              req.io.to(userRoom).emit("pointsUpdated", {
+                totalPoints: user.points.total,
+                awardedPoints: pointsToAward,
+                category: "alumniParticipation",
+                reason: `Achievement in ${eventName}`
+              });
             }
 
             awardResults.push({ name: user.name, status: "awarded", points: pointsToAward });
