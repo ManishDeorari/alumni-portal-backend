@@ -36,6 +36,7 @@ const createPost = async (req, res) => {
     if (finalType === "Announcement" && announcementDetails) {
       finalAnnouncementDetails = {
         isWinnerAnnouncement: announcementDetails.isWinnerAnnouncement || false,
+        eventName: announcementDetails.eventName || "",
         winners: announcementDetails.winners || [],
         pointsRequested: announcementDetails.pointsRequested || false,
         pointsStatus: announcementDetails.pointsRequested ? "pending" : "none",
@@ -77,7 +78,10 @@ const createPost = async (req, res) => {
     });
 
     await post.save();
-    const populated = await post.populate("user", "name profilePicture");
+    const populated = await Post.findById(post._id)
+      .populate("user", "name profilePicture")
+      .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId" })
+      .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" });
     req.io?.emit("postCreated", populated);
 
     // ✅ Award Points Logic

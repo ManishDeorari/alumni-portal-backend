@@ -39,7 +39,9 @@ module.exports = async (req, res) => {
           { path: "user", select: "name profilePicture" },
           { path: "replies.user", select: "name profilePicture" },
         ],
-      });
+      })
+      .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId" })
+      .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" });
 
     const plainPost = updatedPost.toJSON();
 

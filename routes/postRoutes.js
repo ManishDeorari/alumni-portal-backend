@@ -54,9 +54,10 @@ router.post("/:postId/comment/:commentId/reply/:replyId/react", auth, reactToRep
 router.get("/:id", async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
-      .populate("user", "name profilePic")
-      .populate({ path: "comments.user", select: "name profilePic" })
-      .populate({ path: "comments.replies.user", select: "name profilePic" })
+      .populate("user", "name profilePicture")
+      .populate({ path: "comments.user", select: "name profilePicture" })
+      .populate({ path: "comments.replies.user", select: "name profilePicture" })
+      .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId" })
       .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" });
 
     if (!post) return res.status(404).json({ message: "Post not found" });

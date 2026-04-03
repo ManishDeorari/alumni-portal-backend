@@ -12,7 +12,9 @@ const getMyPosts = async (req, res) => {
       .limit(limit)
       .populate("user", "name profilePicture")
       .populate({ path: "comments.user", select: "name profilePicture" })
-      .populate({ path: "comments.replies.user", select: "name profilePicture" });
+      .populate({ path: "comments.replies.user", select: "name profilePicture" })
+      .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId" })
+      .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" });
 
     const total = await Post.countDocuments({ user: req.user._id });
 
