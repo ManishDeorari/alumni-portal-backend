@@ -56,18 +56,22 @@ const approvePointsRequest = async (req, res) => {
             if (!user.points) user.points = { total: 0 };
             user.points.total = (user.points.total || 0) + pointsToAward;
             
-            // Add to 'other' category or specific announcement award category
-            if (user.points.other === undefined) user.points.other = 0;
-            user.points.other += pointsToAward;
+            // Add to 'alumniParticipation' category
+            if (user.points.alumniParticipation === undefined) user.points.alumniParticipation = 0;
+            user.points.alumniParticipation += pointsToAward;
 
             await user.save();
 
-            // Create Notification
+            // Create Notification with event details and post link
+            const eventName = post.announcementDetails?.eventName || "an event";
+            const rank = winner.rank || "a winner";
+
             const newNotification = new Notification({
               sender: req.user._id,
               receiver: user._id,
               type: "points_earned",
-              message: `Congratulations! You earned ${pointsToAward} points for being mentioned in ${post.user.name}'s announcement.`,
+              message: `Congratulations! You earned ${pointsToAward} points for being "${rank}" in "${eventName}".`,
+              postId: post._id
             });
             await newNotification.save();
 
