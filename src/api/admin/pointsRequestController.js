@@ -23,7 +23,7 @@ const getPendingPointsRequests = async (req, res) => {
 
 const approvePointsRequest = async (req, res) => {
   const { postId } = req.params;
-  const { action } = req.body; // 'approve' or 'reject'
+  const { action, awardedPoints } = req.body; // 'approve' or 'reject'
 
   try {
     const post = await Post.findById(postId);
@@ -34,6 +34,21 @@ const approvePointsRequest = async (req, res) => {
     if (action === "reject") {
       if (post.type === "Session") {
         post.pointsStatus = "rejected";
+        // Notify user about rejection
+        const User = require("../../../models/User");
+        const Notification = require("../../../models/Notification");
+        const newNotification = new Notification({
+          sender: req.user._id,
+          receiver: post.user,
+          type: "admin_notice",
+          message: "Your Session points request was declined by the Admin.",
+        });
+        await newNotification.save();
+        if (req.io) {
+          const senderInfo = { _id: req.user._id, name: req.user.name, profilePicture: req.user.profilePicture };
+          const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+          req.io.to(post.user.toString()).emit("newNotification", { ...populatedNotification.toObject(), sender: senderInfo });
+        }
       } else {
         post.announcementDetails.pointsStatus = "rejected";
       }
@@ -48,7 +63,7 @@ const approvePointsRequest = async (req, res) => {
       if (post.type === "Session") {
         const PointsSystemConfig = require("../../../models/PointsSystemConfig");
         const config = await PointsSystemConfig.findOne() || { sessionPoints: 30 };
-        const pointsToAward = config.sessionPoints || 30;
+        const pointsToAward = awardedPoints !== undefined ? Number(awardedPoints) : (config.sessionPoints || 30);
 
         const user = await User.findById(post.user);
         if (user) {

@@ -71,6 +71,12 @@ const postSchema = new mongoose.Schema({
     ],
     pointsRequested: { type: Boolean, default: false },
     pointsStatus: { type: String, enum: ["pending", "approved", "rejected", "none"], default: "none" },
+  },
+  sessionDetails: {
+    schoolOrCollege: { type: String },
+    campus: { type: String },
+    date: { type: String },
+    time: { type: String },
   }
 }, { timestamps: true });
 

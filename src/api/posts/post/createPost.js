@@ -4,7 +4,7 @@ const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
 
 const createPost = async (req, res) => {
   try {
-    const { content, images, video, type } = req.body;
+    const { content, images, video, type, sessionDetails, announcementDetails, pointsRequested, pointsStatus } = req.body;
     const userRole = req.user.role;
     const isAdmin = req.user.isAdmin;
 
@@ -30,7 +30,6 @@ const createPost = async (req, res) => {
       }
     }
 
-    const { announcementDetails, pointsRequested, pointsStatus } = req.body;
     let finalAnnouncementDetails = null;
 
     if (finalType === "Announcement" && announcementDetails) {
@@ -74,6 +73,7 @@ const createPost = async (req, res) => {
       images: hasImages ? images : [],
       video: hasVideo ? video : null,
       type: finalType,
+      sessionDetails: finalType === "Session" ? sessionDetails : undefined,
       announcementDetails: finalAnnouncementDetails,
       pointsRequested: pointsRequested || false,
       pointsStatus: pointsStatus || (pointsRequested ? "pending" : "none"),
