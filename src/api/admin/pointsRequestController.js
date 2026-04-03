@@ -5,8 +5,10 @@ const Notification = require("../../../models/Notification");
 const getPendingPointsRequests = async (req, res) => {
   try {
     const posts = await Post.find({
-      "announcementDetails.pointsRequested": true,
-      "announcementDetails.pointsStatus": "pending"
+      $or: [
+        { "announcementDetails.pointsRequested": true, "announcementDetails.pointsStatus": "pending" },
+        { type: "Session", pointsRequested: true, pointsStatus: "pending" }
+      ]
     })
     .populate("user", "name profilePicture")
     .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId" })
@@ -25,91 +27,116 @@ const approvePointsRequest = async (req, res) => {
 
   try {
     const post = await Post.findById(postId);
-    if (!post || !post.announcementDetails) {
+    if (!post) {
       return res.status(404).json({ message: "Post not found" });
     }
 
     if (action === "reject") {
-      post.announcementDetails.pointsStatus = "rejected";
+      if (post.type === "Session") {
+        post.pointsStatus = "rejected";
+      } else {
+        post.announcementDetails.pointsStatus = "rejected";
+      }
       await post.save();
       return res.json({ message: "Points request rejected" });
     }
 
     if (action === "approve") {
-      const winners = post.announcementDetails.winners || [];
-      const awardResults = [];
-
-      // Use the sender info for notifications
       const senderInfo = { _id: req.user._id, name: req.user.name, profilePicture: req.user.profilePicture };
 
-      for (let winner of winners) {
-        const pointsToAward = parseInt(winner.points) || 0;
-        const targetUserIds = [];
+      // Case 1: Session Post (Points to Owner)
+      if (post.type === "Session") {
+        const PointsSystemConfig = require("../../../models/PointsSystemConfig");
+        const config = await PointsSystemConfig.findOne() || { sessionPoints: 30 };
+        const pointsToAward = config.sessionPoints || 30;
 
-        if (winner.isGroup && Array.isArray(winner.groupMembers)) {
-          targetUserIds.push(...winner.groupMembers);
-        } else if (winner.userId) {
-          targetUserIds.push(winner.userId);
-        }
+        const user = await User.findById(post.user);
+        if (user) {
+          if (!user.points) user.points = { total: 0 };
+          user.points.total = (user.points.total || 0) + pointsToAward;
+          user.points.campusEngagement = (user.points.campusEngagement || 0) + pointsToAward;
+          await user.save();
 
-        for (let targetUserId of targetUserIds) {
-          const user = await User.findById(targetUserId);
-          if (user) {
-            if (!user.points) user.points = { total: 0 };
-            user.points.total = (user.points.total || 0) + pointsToAward;
-            
-            // Add to 'alumniParticipation' category
-            if (user.points.alumniParticipation === undefined) user.points.alumniParticipation = 0;
-            user.points.alumniParticipation += pointsToAward;
+          const newNotification = new Notification({
+            sender: req.user._id,
+            receiver: user._id,
+            type: "points_earned",
+            message: `SESSION_AWARD::${pointsToAward}`,
+            postId: post._id
+          });
+          await newNotification.save();
 
-            await user.save();
-
-            // Create Notification
-            const eventName = post.announcementDetails?.eventName || "an event";
-            const rank = winner.rank || "a winner";
-
-            const newNotification = new Notification({
-              sender: req.user._id,
-              receiver: user._id,
-              type: "points_earned",
-              message: `Congratulations! You earned ${pointsToAward} points for being "${rank}" in "${eventName}".`,
-              postId: post._id
+          if (req.io) {
+            const userRoom = user._id.toString();
+            req.io.to(userRoom).emit("newNotification", { ...newNotification.toObject(), sender: senderInfo });
+            req.io.to(userRoom).emit("pointsUpdated", {
+              totalPoints: user.points.total,
+              awardedPoints: pointsToAward,
+              category: "campusEngagement",
+              reason: "Session Approved"
             });
-            await newNotification.save();
-
-            // Socket emits
-            if (req.io) {
-              const userRoom = user._id.toString();
-              
-              // 1. Live Notification with populated sender
-              const populatedNotification = {
-                ...newNotification.toObject(),
-                sender: senderInfo
-              };
-              req.io.to(userRoom).emit("newNotification", populatedNotification);
-
-              // 2. LIVE POINTS UPDATE - Key fix for the user's request
-              req.io.to(userRoom).emit("pointsUpdated", {
-                totalPoints: user.points.total,
-                awardedPoints: pointsToAward,
-                category: "alumniParticipation",
-                reason: `Achievement in ${eventName}`
-              });
-            }
-
-            awardResults.push({ name: user.name, status: "awarded", points: pointsToAward });
           }
-        }
-        
-        if (targetUserIds.length === 0) {
-          awardResults.push({ name: winner.name, status: "skipped_no_user_match" });
+          
+          post.pointsStatus = "approved";
+          await post.save();
+          return res.json({ message: "Session points approved and awarded" });
         }
       }
 
-      post.announcementDetails.pointsStatus = "approved";
-      await post.save();
+      // Case 2: Announcement Post (Points to Winners)
+      if (post.type === "Announcement" && post.announcementDetails) {
+        const winners = post.announcementDetails.winners || [];
+        const awardResults = [];
 
-      return res.json({ message: "Points request approved and points awarded", results: awardResults });
+        for (let winner of winners) {
+          const pointsToAward = parseInt(winner.points) || 0;
+          const targetUserIds = [];
+
+          if (winner.isGroup && Array.isArray(winner.groupMembers)) {
+            targetUserIds.push(...winner.groupMembers);
+          } else if (winner.userId) {
+            targetUserIds.push(winner.userId);
+          }
+
+          for (let targetUserId of targetUserIds) {
+            const user = await User.findById(targetUserId);
+            if (user) {
+              if (!user.points) user.points = { total: 0 };
+              user.points.total = (user.points.total || 0) + pointsToAward;
+              user.points.alumniParticipation = (user.points.alumniParticipation || 0) + pointsToAward;
+              await user.save();
+
+              const eventName = post.announcementDetails?.eventName || "an event";
+              const rank = winner.rank || "a winner";
+
+              const newNotification = new Notification({
+                sender: req.user._id,
+                receiver: user._id,
+                type: "points_earned",
+                message: `Congratulations! You earned ${pointsToAward} points for being "${rank}" in "${eventName}".`,
+                postId: post._id
+              });
+              await newNotification.save();
+
+              if (req.io) {
+                const userRoom = user._id.toString();
+                req.io.to(userRoom).emit("newNotification", { ...newNotification.toObject(), sender: senderInfo });
+                req.io.to(userRoom).emit("pointsUpdated", {
+                  totalPoints: user.points.total,
+                  awardedPoints: pointsToAward,
+                  category: "alumniParticipation",
+                  reason: `Achievement in ${eventName}`
+                });
+              }
+              awardResults.push({ name: user.name, status: "awarded", points: pointsToAward });
+            }
+          }
+        }
+
+        post.announcementDetails.pointsStatus = "approved";
+        await post.save();
+        return res.json({ message: "Announcement points approved and awarded", results: awardResults });
+      }
     }
 
     res.status(400).json({ message: "Invalid action" });

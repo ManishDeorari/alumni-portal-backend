@@ -8,6 +8,7 @@ const PointsSystemConfigSchema = new mongoose.Schema({
     likePoints: { type: Number, default: 2 },
     postLimitCount: { type: Number, default: 3 },
     postLimitDays: { type: Number, default: 7 },
+    sessionPoints: { type: Number, default: 30 },
     rolloverDate: { type: Date },
     lastRolloverExecutedAt: { type: Date },
 });
