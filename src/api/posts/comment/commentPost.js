@@ -33,7 +33,7 @@ const commentPost = async (req, res) => {
         sender: userId,
         receiver: updatedPost.user._id,
         type: "post_comment",
-        message: `${req.user.name} commented on your post: "${text.substring(0, 20)}${text.length > 20 ? "..." : ""}"`,
+        message: `${req.user.name} commented on your ${updatedPost.type === "Regular" ? "post" : updatedPost.type.toLowerCase()}: "${text.substring(0, 20)}${text.length > 20 ? "..." : ""}"`,
         postId: postId,
       });
       await newNotification.save();

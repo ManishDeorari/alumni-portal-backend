@@ -98,7 +98,7 @@ module.exports = async (req, res) => {
         sender: userId,
         receiver: updatedPost.user._id,
         type: "post_like",
-        message: `${req.user.name} reacted with ${emoji} to your post`,
+        message: `${req.user.name} reacted with ${emoji} to your ${updatedPost.type === "Regular" ? "post" : updatedPost.type.toLowerCase()}`,
         postId: id,
       });
       await newNotification.save();

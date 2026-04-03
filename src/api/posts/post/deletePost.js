@@ -21,7 +21,7 @@ const deletePost = async (req, res) => {
           sender: req.user.id,
           receiver: post.user,
           type: "admin_notice",
-          message: "Your post has been removed by the Admin for violating community guidelines.",
+          message: `Your ${post.type === "Regular" ? "post" : post.type.toLowerCase()} has been removed by the Admin for violating community guidelines.`,
         });
         await adminNote.save();
         if (req.io) {

@@ -30,7 +30,7 @@ const createPost = async (req, res) => {
       }
     }
 
-    const { announcementDetails } = req.body;
+    const { announcementDetails, pointsRequested, pointsStatus } = req.body;
     let finalAnnouncementDetails = null;
 
     if (finalType === "Announcement" && announcementDetails) {
@@ -75,6 +75,8 @@ const createPost = async (req, res) => {
       video: hasVideo ? video : null,
       type: finalType,
       announcementDetails: finalAnnouncementDetails,
+      pointsRequested: pointsRequested || false,
+      pointsStatus: pointsStatus || (pointsRequested ? "pending" : "none"),
     });
 
     await post.save();
