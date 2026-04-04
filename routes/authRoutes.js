@@ -37,17 +37,18 @@ router.post("/signup", async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate publicId
-    const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    // Generate publicId (name-slug + enrollment/employee ID for uniqueness)
+    const nameSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const idSuffix = role === "alumni" ? enrollmentNumber : employeeId;
+    const baseSlug = `${nameSlug}-${idSuffix}`;
     let publicId = baseSlug;
     
-    // In extremely rare cases (less than 1%) where the generated slug isn't unique, loop it until it is perfectly unique.
+    // In extremely rare cases where the combined ID isn't unique, loop it.
     let isUnique = false;
     let counter = 1;
     while (!isUnique) {
       const existing = await User.findOne({ publicId });
       if (existing) {
-        // Fallback: append random numbers or index, e.g. "manish-deorari-1", "-2"
         publicId = `${baseSlug}-${counter}`;
         counter++;
       } else {
