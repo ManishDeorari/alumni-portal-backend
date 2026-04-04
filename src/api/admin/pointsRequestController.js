@@ -6,8 +6,8 @@ const getPendingPointsRequests = async (req, res) => {
   try {
     const posts = await Post.find({
       $or: [
-        { "announcementDetails.pointsRequested": true, "announcementDetails.pointsStatus": "pending" },
-        { type: "Session", pointsRequested: true, pointsStatus: "pending" }
+        { pointsRequested: true, pointsStatus: "pending" },
+        { "announcementDetails.pointsRequested": true, "announcementDetails.pointsStatus": "pending" }
       ]
     })
     .populate("user", "name profilePicture")
@@ -32,9 +32,8 @@ const approvePointsRequest = async (req, res) => {
     }
 
     if (action === "reject") {
+      post.pointsStatus = "rejected";
       if (post.type === "Session") {
-        post.pointsStatus = "rejected";
-        // Notify user about rejection
         const User = require("../../../models/User");
         const Notification = require("../../../models/Notification");
         const newNotification = new Notification({
@@ -49,7 +48,7 @@ const approvePointsRequest = async (req, res) => {
           const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
           req.io.to(post.user.toString()).emit("newNotification", { ...populatedNotification.toObject(), sender: senderInfo });
         }
-      } else {
+      } else if (post.announcementDetails) {
         post.announcementDetails.pointsStatus = "rejected";
       }
       await post.save();
@@ -58,6 +57,7 @@ const approvePointsRequest = async (req, res) => {
 
     if (action === "approve") {
       const senderInfo = { _id: req.user._id, name: req.user.name, profilePicture: req.user.profilePicture };
+      post.pointsStatus = "approved"; // Set root status
 
       // Case 1: Session Post (Points to Owner)
       if (post.type === "Session") {

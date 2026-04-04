@@ -52,6 +52,8 @@ const postSchema = new mongoose.Schema({
     enum: ["Regular", "Session", "Event", "Announcement"],
     default: "Regular",
   },
+  pointsRequested: { type: Boolean, default: false },
+  pointsStatus: { type: String, enum: ["pending", "approved", "rejected", "none"], default: "none" },
   announcementDetails: {
     isWinnerAnnouncement: { type: Boolean, default: false },
     eventName: String, // e.g. "Alumni Meet 2024"

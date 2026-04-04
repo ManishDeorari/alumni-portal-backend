@@ -37,31 +37,20 @@ const createPost = async (req, res) => {
         isWinnerAnnouncement: announcementDetails.isWinnerAnnouncement || false,
         eventName: announcementDetails.eventName || "",
         winners: announcementDetails.winners || [],
-        pointsRequested: announcementDetails.pointsRequested || false,
-        pointsStatus: announcementDetails.pointsRequested ? "pending" : "none",
       };
 
       // Search for userId by name or uniqueId for winners
       if (finalAnnouncementDetails.isWinnerAnnouncement && finalAnnouncementDetails.winners.length > 0) {
         for (let winner of finalAnnouncementDetails.winners) {
-          // If a uniqueId is provided, use it primarily
           if (winner.uniqueId) {
             const matchedUser = await User.findOne({
-              $or: [
-                { publicId: winner.uniqueId },
-                { enrollmentNumber: winner.uniqueId }
-              ]
+              $or: [{ publicId: winner.uniqueId }, { enrollmentNumber: winner.uniqueId }]
             });
-            if (matchedUser) {
-              winner.userId = matchedUser._id;
-            }
+            if (matchedUser) winner.userId = matchedUser._id;
           } 
-          // Fallback to name search if no uniqueId or if user wasn't found by uniqueId
           if (!winner.userId && winner.name) {
             const matchedUser = await User.findOne({ name: { $regex: new RegExp(`^${winner.name}$`, "i") } });
-            if (matchedUser) {
-              winner.userId = matchedUser._id;
-            }
+            if (matchedUser) winner.userId = matchedUser._id;
           }
         }
       }
@@ -75,8 +64,8 @@ const createPost = async (req, res) => {
       type: finalType,
       sessionDetails: finalType === "Session" ? sessionDetails : undefined,
       announcementDetails: finalAnnouncementDetails,
-      pointsRequested: pointsRequested || false,
-      pointsStatus: pointsStatus || (pointsRequested ? "pending" : "none"),
+      pointsRequested: (finalType === "Session" && pointsRequested) || (finalType === "Announcement" && announcementDetails?.pointsRequested) || false,
+      pointsStatus: ((finalType === "Session" && pointsRequested) || (finalType === "Announcement" && announcementDetails?.pointsRequested)) ? "pending" : "none",
     });
 
     await post.save();
