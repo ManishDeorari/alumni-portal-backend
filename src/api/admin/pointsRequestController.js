@@ -33,24 +33,36 @@ const approvePointsRequest = async (req, res) => {
 
     if (action === "reject") {
       post.pointsStatus = "rejected";
+      
+      let message = "Your points request was declined by the Admin.";
       if (post.type === "Session") {
-        const User = require("../../../models/User");
-        const Notification = require("../../../models/Notification");
-        const newNotification = new Notification({
-          sender: req.user._id,
-          receiver: post.user,
-          type: "admin_notice",
-          message: "Your Session points request was declined by the Admin.",
-        });
-        await newNotification.save();
-        if (req.io) {
-          const senderInfo = { _id: req.user._id, name: req.user.name, profilePicture: req.user.profilePicture };
-          const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-          req.io.to(post.user.toString()).emit("newNotification", { ...populatedNotification.toObject(), sender: senderInfo });
-        }
+        message = "Your Alumni Session points request was declined by the Admin.";
       } else if (post.announcementDetails) {
+        const eventName = post.announcementDetails.eventName || "an event";
+        message = `Your points request for event "${eventName}" was declined by the Admin.`;
         post.announcementDetails.pointsStatus = "rejected";
       }
+
+      // Create Rejection Notification
+      const newNotification = new Notification({
+        sender: req.user._id,
+        receiver: post.user,
+        type: "admin_notice",
+        message: message,
+        postId: post._id
+      });
+      await newNotification.save();
+
+      // Emit Live Update
+      if (req.io) {
+        const senderInfo = { _id: req.user._id, name: req.user.name, profilePicture: req.user.profilePicture };
+        const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+        req.io.to(post.user.toString()).emit("newNotification", { 
+          ...populatedNotification.toObject(), 
+          sender: senderInfo 
+        });
+      }
+
       await post.save();
       return res.json({ message: "Points request rejected" });
     }
