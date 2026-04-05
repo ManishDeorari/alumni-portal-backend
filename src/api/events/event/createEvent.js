@@ -21,10 +21,9 @@ const createEvent = async (req, res) => {
     const userRole = req.user.role;
     const isAdmin = req.user.isAdmin;
 
-    // Only Admin or Faculty can create events (as per user req: "Only Admin can create events", but postController allows faculty too)
-    // I will stick to user request: "Only Admin can create events"
-    if (!isAdmin && userRole !== "admin") {
-      return res.status(403).json({ message: "Only administrators can create events." });
+    // Allow Admin or Faculty to create events
+    if (!isAdmin && userRole !== "admin" && userRole !== "faculty") {
+      return res.status(403).json({ message: "Only administrators and faculty can create events." });
     }
 
     if (!title || !description || !startDate || !startTime || !endDate || !registrationCloseDate) {
