@@ -217,42 +217,43 @@ const performDeepDelete = async (userId) => {
       { $pull: { "reactions.users": user._id } }
     );
 
-    // === 5. REACTION & WINNER LIST FLUSHING (DEEP CLEAN) ===
-    // Reactions are stored in Maps (Posts and Events)
-    // We update all posts/events where user might have reacted.
-    // For Comments/Replies which are sub-documents, we can use positional filters.
-    // Deep scrub Post sub-document reactions & winners
-    // 1. Remove user from any group members lists in winners
+    // === 5. NESTED CONTENT SCRUBBING (INSIDE-OUT) ===
+    console.log(`🧹 [DeepScrub] Flushing nested content (Replies -> Comments -> Winners)...`);
+    
+    // A. POSTS: Flush Replies (Deepest level)
     await Post.updateMany(
-      { "announcementDetails.winners.groupMembers": user._id },
-      { $pull: { "announcementDetails.winners.$[].groupMembers": user._id } }
+      { "comments.replies.user": user._id },
+      { $pull: { "comments.$[].replies": { user: user._id } } }
     );
-    // 2. Remove user themselves from the winners list if they were a winner
+
+    // B. POSTS: Flush Comments (Intermediate level)
+    await Post.updateMany(
+      { "comments.user": user._id },
+      { $pull: { comments: { user: user._id } } }
+    );
+
+    // C. POSTS: Flush Winner Group Members (Nested)
+    await Post.updateMany(
+       { "announcementDetails.winners.groupMembers": user._id },
+       { $pull: { "announcementDetails.winners.$[].groupMembers": user._id } }
+    );
+
+    // D. POSTS: Flush Primary Winners (Parent)
     await Post.updateMany(
       { "announcementDetails.winners.userId": user._id },
       { $pull: { "announcementDetails.winners": { userId: user._id } } }
     );
 
-    // Delete comments/replies made by this user on OTHER people's posts
-    await Post.updateMany(
-      {},
-      { 
-        $pull: { 
-          comments: { user: user._id },
-          "comments.$[].replies": { user: user._id } 
-        } 
-      }
+    // E. EVENTS: Flush Replies (Deepest level)
+    await Event.updateMany(
+      { "comments.replies.user": user._id },
+      { $pull: { "comments.$[].replies": { user: user._id } } }
     );
 
-    // Repeat for Events
+    // F. EVENTS: Flush Comments (Parent level)
     await Event.updateMany(
-      {},
-      { 
-        $pull: { 
-          comments: { user: user._id },
-          "comments.$[].replies": { user: user._id } 
-        } 
-      }
+      { "comments.user": user._id },
+      { $pull: { comments: { user: user._id } } }
     );
 
     // === 6. BULK RECORD REMOVAL ===
