@@ -186,6 +186,13 @@ router.delete("/delete-user/:id", authenticate, verifyAdmin, async (req, res) =>
   if (!result.success) {
     return res.status(result.message.includes("Admin") ? 403 : 404).json({ message: result.message });
   }
+
+  // 🔔 REAL-TIME LOGOUT: Notify user to disconnect immediately
+  if (req.io) {
+    req.io.to(req.params.id).emit("forceLogout");
+    console.log(`📡 [Socket] Emitted forceLogout to user: ${req.params.id}`);
+  }
+
   res.json({ message: `${result.name} and all their data/media have been deleted.` });
 });
 
@@ -203,7 +210,16 @@ router.post("/delete-users-bulk", authenticate, verifyAdmin, async (req, res) =>
   const batchSize = 5;
   for (let i = 0; i < userIds.length; i += batchSize) {
     const batch = userIds.slice(i, i + batchSize);
-    const batchResults = await Promise.all(batch.map(id => performDeepDelete(id)));
+    const batchResults = await Promise.all(batch.map(async id => {
+      const res = await performDeepDelete(id);
+      
+      // 🔔 REAL-TIME LOGOUT: Notify user to disconnect immediately if deletion is successful
+      if (res.success && req.io) {
+        req.io.to(id).emit("forceLogout");
+        console.log(`📡 [Socket] Emitted forceLogout (bulk) to user: ${id}`);
+      }
+      return res;
+    }));
     results.push(...batchResults);
   }
 
