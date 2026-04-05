@@ -112,30 +112,25 @@ router.put("/remove-admin/:id", authenticate, verifyAdmin, async (req, res) => {
   }
 });
 
-// ✅ 5️⃣ Reject/Delete a user (faculty or alumni)
-router.delete("/delete-user/:id", authenticate, verifyAdmin, async (req, res) => {
+// 🛡️ Helper: Perform Deep Deletion
+const performDeepDelete = async (userId) => {
+  const user = await User.findById(userId);
+  if (!user) return { success: false, id: userId, message: "User not found" };
+
+  // Prevent deleting main admin
+  if (user.isMainAdmin || user.email === "admin@alumniportal.com" || user.email === "manishdeorari377@gmail.com") {
+    return { success: false, id: userId, message: "Cannot delete Main Admin" };
+  }
+
+  console.log(`🚀 Starting Deep Delete for user: ${user.name} (${user.email})`);
+
   try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    // Prevent deleting main admin
-    if (user.isMainAdmin || user.email === "admin@alumniportal.com" || user.email === "manishdeorari377@gmail.com") {
-      return res.status(403).json({ message: "Cannot delete Main Admin" });
-    }
-
-    console.log(`🚀 Starting Deep Delete for user: ${user.name} (${user.email})`);
-
     // 1. Collect Media for Cloudinary Cleanup
     const publicIds = [];
 
-    // Profile & Banner (Extract from URL if string)
     const extractId = (url) => {
       if (!url || !url.includes("res.cloudinary.com")) return null;
       try {
-        const parts = url.split("/");
-        const lastPart = parts[parts.length - 1];
-        const folderPart = url.includes("/posts/") ? "posts/" : ""; // Adjust based on your folder structure if known
-        // Simpler: find /upload/ and take everything after (minus version and extension)
         const afterUpload = url.split("/upload/")[1];
         if (!afterUpload) return null;
         const noVersion = afterUpload.replace(/v\d+\//, "");
@@ -172,18 +167,58 @@ router.delete("/delete-user/:id", authenticate, verifyAdmin, async (req, res) =>
 
     // 4. Delete Posts from DB
     await Post.deleteMany({ user: user._id });
-    console.log(`🗑 Deleted ${userPosts.length} posts.`);
 
-    // Send email notification (Existing logic)
+    // Send email notification
     sendDeletionEmail(user).catch(err => console.error("Failed to send deletion email:", err.message));
 
     // 5. Finally Delete User
     await user.deleteOne();
-    res.json({ message: `${user.name} and all their data/media have been deleted successfully.` });
+    return { success: true, id: userId, name: user.name };
   } catch (error) {
-    console.error("Delete error:", error);
-    res.status(500).json({ message: "Failed to delete user" });
+    console.error(`Deep delete error for ${userId}:`, error);
+    return { success: false, id: userId, message: error.message };
   }
+};
+
+// ✅ 5️⃣ Reject/Delete a user (Single)
+router.delete("/delete-user/:id", authenticate, verifyAdmin, async (req, res) => {
+  const result = await performDeepDelete(req.params.id);
+  if (!result.success) {
+    return res.status(result.message.includes("Admin") ? 403 : 404).json({ message: result.message });
+  }
+  res.json({ message: `${result.name} and all their data/media have been deleted.` });
+});
+
+// ✅ 5.5 Bulk Delete Users
+router.post("/delete-users-bulk", authenticate, verifyAdmin, async (req, res) => {
+  const { userIds } = req.body;
+  if (!userIds || !Array.isArray(userIds)) {
+    return res.status(400).json({ message: "Invalid user IDs" });
+  }
+
+  console.log(`🧹 Bulk deleting ${userIds.length} users...`);
+
+  const results = [];
+  // Process in batches of 5 to prevent overwhelming services
+  const batchSize = 5;
+  for (let i = 0; i < userIds.length; i += batchSize) {
+    const batch = userIds.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(id => performDeepDelete(id)));
+    results.push(...batchResults);
+  }
+
+  const successful = results.filter(r => r.success);
+  const failed = results.filter(r => !r.success);
+
+  res.json({
+    message: `Processed ${userIds.length} deletions.`,
+    summary: {
+      total: userIds.length,
+      successful: successful.length,
+      failed: failed.length,
+    },
+    failedIds: failed.map(f => f.id)
+  });
 });
 
 // ✅ 6️⃣ Leaderboard — view top alumni by points
