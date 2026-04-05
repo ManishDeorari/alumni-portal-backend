@@ -64,8 +64,19 @@ const createEvent = async (req, res) => {
     const ev = populated.toObject();
     const eventResp = { ...ev, user: ev.createdBy, type: "Event", content: ev.description };
 
-    // Notify via socket if needed
+    // Notify via socket for feed update
     req.io?.emit("postCreated", eventResp);
+
+    // ✅ NEW: Broadcast persistent notification to all Staff (Admin/Faculty)
+    const { notifyStaff } = require("../../../../utils/notificationHelper");
+    const creatorName = populated.createdBy?.name || "A user";
+    await notifyStaff(
+      req.io,
+      req.user._id || req.user.id,
+      "admin_notice",
+      `${creatorName} created a new Event: "${event.title}"`,
+      { postId: event._id }
+    );
 
     res.status(201).json({ event: eventResp });
   } catch (err) {

@@ -53,7 +53,7 @@ const approvePointsRequest = async (req, res) => {
       });
       await newNotification.save();
 
-      // Emit Live Update
+      // Emit Live Update to the affected user
       if (req.io) {
         const senderInfo = { _id: req.user._id, name: req.user.name, profilePicture: req.user.profilePicture };
         const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
@@ -61,6 +61,16 @@ const approvePointsRequest = async (req, res) => {
           ...populatedNotification.toObject(), 
           sender: senderInfo 
         });
+
+        // ✅ NEW: Broadcast to other staff members
+        const { notifyStaff } = require("../../../utils/notificationHelper");
+        await notifyStaff(
+          req.io,
+          req.user._id || req.user.id,
+          "admin_notice",
+          `${req.user.name} declined a points request for: "${post.content?.substring(0, 30)}..."`,
+          { postId: post._id }
+        );
       }
 
       await post.save();

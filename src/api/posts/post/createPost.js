@@ -73,7 +73,21 @@ const createPost = async (req, res) => {
       .populate("user", "name profilePicture")
       .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId" })
       .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" });
+    
     req.io?.emit("postCreated", populated);
+
+    // ✅ NEW: Broadcast persistent notification for Announcements to all Staff (Admin/Faculty)
+    if (finalType === "Announcement") {
+      const { notifyStaff } = require("../../../../utils/notificationHelper");
+      const creatorName = populated.user?.name || "A user";
+      await notifyStaff(
+        req.io,
+        req.user._id || req.user.id,
+        "admin_notice",
+        `${creatorName} posted an official Announcement: "${announcementDetails?.eventName || "Event Details"}"`,
+        { postId: post._id }
+      );
+    }
 
     // ✅ Award Points Logic
     if (userRole === "alumni") {
