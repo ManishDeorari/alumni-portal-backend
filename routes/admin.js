@@ -172,64 +172,70 @@ const performDeepDelete = async (userId) => {
 
     // 📝 Post Media (All types)
     const userPosts = await Post.find({ user: user._id });
+    console.log(`📑 [MediaGather] Found ${userPosts.length} posts for user ${user._id}`);
+    
     userPosts.forEach(post => {
+      let foundInPost = 0;
       (post.images || []).forEach(img => {
         const info = extractMediaInfo(img);
-        if (info) mediaToDestroy.push(info);
+        if (info) { mediaToDestroy.push(info); foundInPost++; }
       });
       if (post.video) {
         const info = extractMediaInfo(post.video);
         if (info) {
-          info.type = "video"; // Explicitly tag as video for fallback priority
+          info.type = "video";
           mediaToDestroy.push(info);
+          foundInPost++;
         }
       }
+      if (foundInPost > 0) console.log(`🎥 [MediaGather] Collected ${foundInPost} items from Post: ${post._id}`);
     });
 
     // 📅 Event Media (All types)
     const userEvents = await Event.find({ createdBy: user._id });
+    console.log(`📑 [MediaGather] Found ${userEvents.length} events for user ${user._id}`);
+    
     userEvents.forEach(evt => {
+      let foundInEvt = 0;
       (evt.images || []).forEach(img => {
         const info = extractMediaInfo(img);
-        if (info) mediaToDestroy.push(info);
+        if (info) { mediaToDestroy.push(info); foundInEvt++; }
       });
       if (evt.video) {
         const info = extractMediaInfo(evt.video);
         if (info) {
           info.type = "video";
           mediaToDestroy.push(info);
+          foundInEvt++;
         }
       }
+      if (foundInEvt > 0) console.log(`🎥 [MediaGather] Collected ${foundInEvt} items from Event: ${evt._id}`);
     });
 
     // 💬 Group Message Media (FOR ALL USERS)
-    const personalMessages = await GroupMessage.find({ 
-      $or: [
-        { sender: user._id },
-        { mediaUrl: { $exists: true } } // Safety search
-      ]
-    });
+    const personalMessages = await GroupMessage.find({ sender: user._id });
+    console.log(`📑 [MediaGather] Found ${personalMessages.length} group messages for user ${user._id}`);
     
     personalMessages.forEach(msg => {
-      if (msg.sender && msg.sender.toString() === user._id.toString()) {
+      if (msg.mediaUrl || msg.mediaPublicId) {
         const info = extractMediaInfo({ url: msg.mediaUrl, public_id: msg.mediaPublicId });
         if (info) {
           if (msg.type === "image") info.type = "image";
           mediaToDestroy.push(info);
+          console.log(`🎥 [MediaGather] Collected item from GroupMsg: ${msg._id}`);
         }
       }
     });
 
     // Deduplicate to avoid redundant API calls
     const uniqueMedia = Array.from(new Set(mediaToDestroy.map(m => JSON.stringify(m)))).map(s => JSON.parse(s));
+    console.log(`🎯 [MediaGather] TOTAL UNIQUE ITEMS TO DESTROY: ${uniqueMedia.length}`);
 
     // === 2. EXECUTE CLOUDINARY CLEANUP (WITH MULTI-PASS FALLBACKS) ===
-    const cloudinaryTypes = ["image", "video", "raw", "auto"];
+    const cloudinaryTypes = ["video", "image", "raw", "auto"]; // Video first as it's the priority
     
     for (const item of uniqueMedia) {
       let successfullyDeleted = false;
-      
-      // Try with the detected type first, then fall back to others if 'not_found'
       const fallbackRotation = [item.type, ...cloudinaryTypes.filter(t => t !== item.type)];
       
       for (const resourceType of fallbackRotation) {
@@ -241,16 +247,12 @@ const performDeepDelete = async (userId) => {
             break; 
           }
         } catch (err) {
-          // Log only if it's not a simple 'not_found' error
           if (!err.message.includes("not found")) {
-            console.error(`⚠️ [Cloudinary] Error trying to delete ${item.id} as ${resourceType}:`, err.message);
+            console.error(`⚠️ [Cloudinary] Error destroying ${item.id} as ${resourceType}:`, err.message);
           }
         }
       }
-      
-      if (!successfullyDeleted) {
-        console.warn(`❌ [Cloudinary] Failed to delete ${item.id} after attempting all fallback types.`);
-      }
+      if (!successfullyDeleted) console.warn(`❌ [Cloudinary] Failed destruction for ${item.id} after all fallbacks.`);
     }
 
     // === 3. NETWORK & CONNECTION CLEANUP ===
