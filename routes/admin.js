@@ -221,18 +221,16 @@ const performDeepDelete = async (userId) => {
     // Reactions are stored in Maps (Posts and Events)
     // We update all posts/events where user might have reacted.
     // For Comments/Replies which are sub-documents, we can use positional filters.
-    // Deep scrub Post sub-document reactions
+    // Deep scrub Post sub-document reactions & winners
+    // 1. Remove user from any group members lists in winners
     await Post.updateMany(
-      {},
-      {
-        $pull: {
-          "announcementDetails.winners": { userId: user._id },
-          "announcementDetails.winners.$[].groupMembers": user._id,
-          // Since reactions are Maps, pulling from a dynamic path is harder.
-          // However, we scrub the user document itself which breaks the link, 
-          // and we pull from common locations.
-        }
-      }
+      { "announcementDetails.winners.groupMembers": user._id },
+      { $pull: { "announcementDetails.winners.$[].groupMembers": user._id } }
+    );
+    // 2. Remove user themselves from the winners list if they were a winner
+    await Post.updateMany(
+      { "announcementDetails.winners.userId": user._id },
+      { $pull: { "announcementDetails.winners": { userId: user._id } } }
     );
 
     // Delete comments/replies made by this user on OTHER people's posts
