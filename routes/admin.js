@@ -137,13 +137,13 @@ const performDeepDelete = async (userId) => {
       if (!media) return null;
       
       let url = typeof media === "string" ? media : media.url;
-      let public_id = typeof media === "string" ? null : media.public_id;
+      let public_id = typeof media === "object" ? media.public_id : null;
       
       if (!url && !public_id) return null;
 
-      // Determine resource type
+      // Determine initial guess for resource type
       let type = "image";
-      if (url && (url.includes("/video/upload/") || url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i))) {
+      if (url && (url.includes("/video/") || url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i))) {
         type = "video";
       }
 
@@ -151,84 +151,105 @@ const performDeepDelete = async (userId) => {
       let id = public_id;
       if (!id && url && url.includes("res.cloudinary.com")) {
         try {
-          const afterUpload = url.split("/upload/")[1];
-          if (afterUpload) {
-            const noVersion = afterUpload.replace(/v\d+\//, "");
-            id = noVersion.substring(0, noVersion.lastIndexOf("."));
+          // Cloudinary URLs: .../upload/v12345/folder/id.ext
+          const parts = url.split("/upload/");
+          if (parts.length > 1) {
+            const pathAfterUpload = parts[1].replace(/v\d+\//, ""); // Remove versioning
+            const lastDot = pathAfterUpload.lastIndexOf(".");
+            id = lastDot !== -1 ? pathAfterUpload.substring(0, lastDot) : pathAfterUpload;
           }
-        } catch (e) { console.error("Error extracting ID from URL:", url); }
+        } catch (e) { console.error("❌ ID extraction failed for:", url); }
       }
 
       return id ? { id, type } : null;
     };
 
-    // User Media
+    // 👤 User Profile & Banner
     const profileMedia = extractMediaInfo(user.profilePicture);
     if (profileMedia) mediaToDestroy.push(profileMedia);
     const bannerMedia = extractMediaInfo(user.bannerImage);
     if (bannerMedia) mediaToDestroy.push(bannerMedia);
 
-    // Post Media (Both Images & Videos)
+    // 📝 Post Media (All types)
     const userPosts = await Post.find({ user: user._id });
     userPosts.forEach(post => {
-      // Images array
       (post.images || []).forEach(img => {
         const info = extractMediaInfo(img);
         if (info) mediaToDestroy.push(info);
       });
-      // Video field
       if (post.video) {
         const info = extractMediaInfo(post.video);
         if (info) {
-          info.type = "video"; // Force video type for video field
+          info.type = "video"; // Explicitly tag as video for fallback priority
           mediaToDestroy.push(info);
         }
       }
     });
 
-    // Event Media (Both Images & Videos)
+    // 📅 Event Media (All types)
     const userEvents = await Event.find({ createdBy: user._id });
     userEvents.forEach(evt => {
-      // Images array
       (evt.images || []).forEach(img => {
         const info = extractMediaInfo(img);
         if (info) mediaToDestroy.push(info);
       });
-      // Video field
       if (evt.video) {
         const info = extractMediaInfo(evt.video);
         if (info) {
-          info.type = "video"; // Force video type for video field
+          info.type = "video";
           mediaToDestroy.push(info);
         }
       }
     });
 
-    // Faculty-Specific: Group Message Media
-    if (user.role === "faculty") {
-      const facultyMessages = await GroupMessage.find({ sender: user._id });
-      facultyMessages.forEach(msg => {
-        if (msg.mediaUrl || msg.mediaPublicId) {
-          const info = extractMediaInfo({ url: msg.mediaUrl, public_id: msg.mediaPublicId });
-          if (info) {
-            // Check type from message type or URL
-            if (msg.type === "image") info.type = "image";
-            mediaToDestroy.push(info);
-          }
+    // 💬 Group Message Media (FOR ALL USERS)
+    const personalMessages = await GroupMessage.find({ 
+      $or: [
+        { sender: user._id },
+        { mediaUrl: { $exists: true } } // Safety search
+      ]
+    });
+    
+    personalMessages.forEach(msg => {
+      if (msg.sender && msg.sender.toString() === user._id.toString()) {
+        const info = extractMediaInfo({ url: msg.mediaUrl, public_id: msg.mediaPublicId });
+        if (info) {
+          if (msg.type === "image") info.type = "image";
+          mediaToDestroy.push(info);
         }
-      });
-    }
+      }
+    });
 
-    // Deduplicate media to avoid redundant Cloudinary calls
+    // Deduplicate to avoid redundant API calls
     const uniqueMedia = Array.from(new Set(mediaToDestroy.map(m => JSON.stringify(m)))).map(s => JSON.parse(s));
 
-    // === 2. EXECUTE CLOUDINARY CLEANUP ===
+    // === 2. EXECUTE CLOUDINARY CLEANUP (WITH MULTI-PASS FALLBACKS) ===
+    const cloudinaryTypes = ["image", "video", "raw", "auto"];
+    
     for (const item of uniqueMedia) {
-      try {
-        const result = await cloudinary.uploader.destroy(item.id, { resource_type: item.type });
-        console.log(`🗑  [Cloudinary] Deleted ${item.type}: ${item.id} | Result: ${result.result}`);
-      } catch (err) {
-        console.error(`❌ [Cloudinary] Cleanup failed for ${item.id} (${item.type}):`, err.message);
+      let successfullyDeleted = false;
+      
+      // Try with the detected type first, then fall back to others if 'not_found'
+      const fallbackRotation = [item.type, ...cloudinaryTypes.filter(t => t !== item.type)];
+      
+      for (const resourceType of fallbackRotation) {
+        try {
+          const res = await cloudinary.uploader.destroy(item.id, { resource_type: resourceType });
+          if (res.result === "ok") {
+            console.log(`🗑  [Cloudinary] Successfully destroyed ${item.id} as ${resourceType}`);
+            successfullyDeleted = true;
+            break; 
+          }
+        } catch (err) {
+          // Log only if it's not a simple 'not_found' error
+          if (!err.message.includes("not found")) {
+            console.error(`⚠️ [Cloudinary] Error trying to delete ${item.id} as ${resourceType}:`, err.message);
+          }
+        }
+      }
+      
+      if (!successfullyDeleted) {
+        console.warn(`❌ [Cloudinary] Failed to delete ${item.id} after attempting all fallback types.`);
       }
     }
 
