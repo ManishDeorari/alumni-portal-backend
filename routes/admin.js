@@ -3,6 +3,7 @@ const router = express.Router();
 const User = require("../models/User");
 const Post = require("../models/Post");
 const Group = require("../models/Group");
+const Event = require("../models/Event");
 const Connect = require("../models/Connect");
 const Notification = require("../models/Notification");
 const Registration = require("../models/Registration");
