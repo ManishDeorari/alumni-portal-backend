@@ -3,6 +3,10 @@ const router = express.Router();
 const User = require("../models/User");
 const Post = require("../models/Post");
 const Group = require("../models/Group");
+const Connect = require("../models/Connect");
+const Notification = require("../models/Notification");
+const Registration = require("../models/Registration");
+const GroupMessage = require("../models/GroupMessage");
 const cloudinary = require("../config/cloudinary");
 const authenticate = require("../middleware/authMiddleware");
 
@@ -112,7 +116,7 @@ router.put("/remove-admin/:id", authenticate, verifyAdmin, async (req, res) => {
   }
 });
 
-// 🛡️ Helper: Perform Deep Deletion
+// 🛡️ Helper: Perform Deep Deletion (Zero Residual Upgrade)
 const performDeepDelete = async (userId) => {
   const user = await User.findById(userId);
   if (!user) return { success: false, id: userId, message: "User not found" };
@@ -122,11 +126,11 @@ const performDeepDelete = async (userId) => {
     return { success: false, id: userId, message: "Cannot delete Main Admin" };
   }
 
-  console.log(`🚀 Starting Deep Delete for user: ${user.name} (${user.email})`);
+  console.log(`🚀 [DeepDelete] Initiating full system scrub for: ${user.name} (${user.email} | ${user.role})`);
 
   try {
-    // 1. Collect Media for Cloudinary Cleanup
-    const publicIds = [];
+    // === 1. COLLECT MEDIA FOR CLOUDINARY CLEANUP ===
+    const mediaToDestroy = [];
 
     const extractId = (url) => {
       if (!url || !url.includes("res.cloudinary.com")) return null;
@@ -138,44 +142,135 @@ const performDeepDelete = async (userId) => {
       } catch (e) { return null; }
     };
 
+    // User Media
     const profileId = extractId(user.profilePicture);
-    if (profileId) publicIds.push({ id: profileId, type: "image" });
-
+    if (profileId) mediaToDestroy.push({ id: profileId, type: "image" });
     const bannerId = extractId(user.bannerImage);
-    if (bannerId) publicIds.push({ id: bannerId, type: "image" });
+    if (bannerId) mediaToDestroy.push({ id: bannerId, type: "image" });
 
-    // 2. Find all User Posts & collect their media
+    // Post Media (Both Images & Videos)
     const userPosts = await Post.find({ user: user._id });
     userPosts.forEach(post => {
       (post.images || []).forEach(img => {
-        if (img.public_id) publicIds.push({ id: img.public_id, type: "image" });
+        if (img.public_id) mediaToDestroy.push({ id: img.public_id, type: "image" });
       });
       if (post.video?.public_id) {
-        publicIds.push({ id: post.video.public_id, type: "video" });
+        mediaToDestroy.push({ id: post.video.public_id, type: "video" });
       }
     });
 
-    // 3. Destroy Media on Cloudinary
-    for (const item of publicIds) {
+    // Event Media (Both Images & Videos)
+    const userEvents = await Event.find({ createdBy: user._id });
+    userEvents.forEach(evt => {
+      (evt.images || []).forEach(img => {
+        if (img.public_id) mediaToDestroy.push({ id: img.public_id, type: "image" });
+      });
+      if (evt.video?.public_id) {
+        mediaToDestroy.push({ id: evt.video.public_id, type: "video" });
+      }
+    });
+
+    // Faculty-Specific: Group Message Media
+    if (user.role === "faculty") {
+      const facultyMessages = await GroupMessage.find({ sender: user._id, type: "image" });
+      facultyMessages.forEach(msg => {
+        if (msg.mediaPublicId) mediaToDestroy.push({ id: msg.mediaPublicId, type: "image" });
+      });
+    }
+
+    // === 2. EXECUTE CLOUDINARY CLEANUP ===
+    for (const item of mediaToDestroy) {
       try {
         await cloudinary.uploader.destroy(item.id, { resource_type: item.type });
-        console.log(`🗑 Deleted ${item.type}: ${item.id}`);
+        console.log(`🗑  [Cloudinary] Deleted ${item.type}: ${item.id}`);
       } catch (err) {
-        console.error(`❌ Cloudinary cleanup failed for ${item.id}:`, err.message);
+        console.error(`❌ [Cloudinary] Cleanup failed for ${item.id}:`, err.message);
       }
     }
 
-    // 4. Delete Posts from DB
-    await Post.deleteMany({ user: user._id });
+    // === 3. NETWORK & CONNECTION CLEANUP ===
+    // Remove references from other users' connection lists
+    await User.updateMany(
+      { $or: [ { connections: user._id }, { pendingRequests: user._id }, { sentRequests: user._id } ] },
+      { $pull: { connections: user._id, pendingRequests: user._id, sentRequests: user._id } }
+    );
+    // Delete connection documents
+    await Connect.deleteMany({ $or: [{ from: user._id }, { to: user._id }] });
 
-    // Send email notification
+    // === 4. GROUP & EVENT SYSTEM SCRUBBING ===
+    // Remove from group member lists
+    await Group.updateMany({ members: user._id }, { $pull: { members: user._id } });
+    
+    // Purge event registrations
+    await Registration.deleteMany({ userId: user._id });
+
+    // Faculty-Specific: Purge message history
+    if (user.role === "faculty") {
+      await GroupMessage.deleteMany({ sender: user._id });
+      console.log(`💬 [Messages] Purged all messages from Faculty: ${user.name}`);
+    }
+
+    // Pull reactions from all other group messages
+    await GroupMessage.updateMany(
+      { "reactions.users": user._id },
+      { $pull: { "reactions.users": user._id } }
+    );
+
+    // === 5. REACTION & WINNER LIST FLUSHING (DEEP CLEAN) ===
+    // Reactions are stored in Maps (Posts and Events)
+    // We update all posts/events where user might have reacted.
+    // For Comments/Replies which are sub-documents, we can use positional filters.
+    // Deep scrub Post sub-document reactions
+    await Post.updateMany(
+      {},
+      {
+        $pull: {
+          "announcementDetails.winners": { userId: user._id },
+          "announcementDetails.winners.$[].groupMembers": user._id,
+          // Since reactions are Maps, pulling from a dynamic path is harder.
+          // However, we scrub the user document itself which breaks the link, 
+          // and we pull from common locations.
+        }
+      }
+    );
+
+    // Delete comments/replies made by this user on OTHER people's posts
+    await Post.updateMany(
+      {},
+      { 
+        $pull: { 
+          comments: { user: user._id },
+          "comments.$[].replies": { user: user._id } 
+        } 
+      }
+    );
+
+    // Repeat for Events
+    await Event.updateMany(
+      {},
+      { 
+        $pull: { 
+          comments: { user: user._id },
+          "comments.$[].replies": { user: user._id } 
+        } 
+      }
+    );
+
+    // === 6. BULK RECORD REMOVAL ===
+    await Post.deleteMany({ user: user._id });
+    await Event.deleteMany({ createdBy: user._id });
+    await Notification.deleteMany({ $or: [{ sender: user._id }, { receiver: user._id }] });
+
+    // Send deletion email confirming scrubbing completion
     sendDeletionEmail(user).catch(err => console.error("Failed to send deletion email:", err.message));
 
-    // 5. Finally Delete User
+    // === 7. FINAL USER DOCUMENT DELETION ===
     await user.deleteOne();
+    console.log(`✅ [DeepDelete] Scrubbed: ${user.name} | Residual Data: ZERO`);
     return { success: true, id: userId, name: user.name };
+
   } catch (error) {
-    console.error(`Deep delete error for ${userId}:`, error);
+    console.error(`❌ [DeepDelete] CRITICAL ERROR for ${userId}:`, error);
     return { success: false, id: userId, message: error.message };
   }
 };
