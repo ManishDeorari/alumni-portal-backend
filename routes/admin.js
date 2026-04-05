@@ -133,59 +133,102 @@ const performDeepDelete = async (userId) => {
     // === 1. COLLECT MEDIA FOR CLOUDINARY CLEANUP ===
     const mediaToDestroy = [];
 
-    const extractId = (url) => {
-      if (!url || !url.includes("res.cloudinary.com")) return null;
-      try {
-        const afterUpload = url.split("/upload/")[1];
-        if (!afterUpload) return null;
-        const noVersion = afterUpload.replace(/v\d+\//, "");
-        return noVersion.substring(0, noVersion.lastIndexOf("."));
-      } catch (e) { return null; }
+    const extractMediaInfo = (media) => {
+      if (!media) return null;
+      
+      let url = typeof media === "string" ? media : media.url;
+      let public_id = typeof media === "string" ? null : media.public_id;
+      
+      if (!url && !public_id) return null;
+
+      // Determine resource type
+      let type = "image";
+      if (url && (url.includes("/video/upload/") || url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i))) {
+        type = "video";
+      }
+
+      // Use stored public_id if available, otherwise extract from URL
+      let id = public_id;
+      if (!id && url && url.includes("res.cloudinary.com")) {
+        try {
+          const afterUpload = url.split("/upload/")[1];
+          if (afterUpload) {
+            const noVersion = afterUpload.replace(/v\d+\//, "");
+            id = noVersion.substring(0, noVersion.lastIndexOf("."));
+          }
+        } catch (e) { console.error("Error extracting ID from URL:", url); }
+      }
+
+      return id ? { id, type } : null;
     };
 
     // User Media
-    const profileId = extractId(user.profilePicture);
-    if (profileId) mediaToDestroy.push({ id: profileId, type: "image" });
-    const bannerId = extractId(user.bannerImage);
-    if (bannerId) mediaToDestroy.push({ id: bannerId, type: "image" });
+    const profileMedia = extractMediaInfo(user.profilePicture);
+    if (profileMedia) mediaToDestroy.push(profileMedia);
+    const bannerMedia = extractMediaInfo(user.bannerImage);
+    if (bannerMedia) mediaToDestroy.push(bannerMedia);
 
     // Post Media (Both Images & Videos)
     const userPosts = await Post.find({ user: user._id });
     userPosts.forEach(post => {
+      // Images array
       (post.images || []).forEach(img => {
-        if (img.public_id) mediaToDestroy.push({ id: img.public_id, type: "image" });
+        const info = extractMediaInfo(img);
+        if (info) mediaToDestroy.push(info);
       });
-      if (post.video?.public_id) {
-        mediaToDestroy.push({ id: post.video.public_id, type: "video" });
+      // Video field
+      if (post.video) {
+        const info = extractMediaInfo(post.video);
+        if (info) {
+          info.type = "video"; // Force video type for video field
+          mediaToDestroy.push(info);
+        }
       }
     });
 
     // Event Media (Both Images & Videos)
     const userEvents = await Event.find({ createdBy: user._id });
     userEvents.forEach(evt => {
+      // Images array
       (evt.images || []).forEach(img => {
-        if (img.public_id) mediaToDestroy.push({ id: img.public_id, type: "image" });
+        const info = extractMediaInfo(img);
+        if (info) mediaToDestroy.push(info);
       });
-      if (evt.video?.public_id) {
-        mediaToDestroy.push({ id: evt.video.public_id, type: "video" });
+      // Video field
+      if (evt.video) {
+        const info = extractMediaInfo(evt.video);
+        if (info) {
+          info.type = "video"; // Force video type for video field
+          mediaToDestroy.push(info);
+        }
       }
     });
 
     // Faculty-Specific: Group Message Media
     if (user.role === "faculty") {
-      const facultyMessages = await GroupMessage.find({ sender: user._id, type: "image" });
+      const facultyMessages = await GroupMessage.find({ sender: user._id });
       facultyMessages.forEach(msg => {
-        if (msg.mediaPublicId) mediaToDestroy.push({ id: msg.mediaPublicId, type: "image" });
+        if (msg.mediaUrl || msg.mediaPublicId) {
+          const info = extractMediaInfo({ url: msg.mediaUrl, public_id: msg.mediaPublicId });
+          if (info) {
+            // Check type from message type or URL
+            if (msg.type === "image") info.type = "image";
+            mediaToDestroy.push(info);
+          }
+        }
       });
     }
 
+    // Deduplicate media to avoid redundant Cloudinary calls
+    const uniqueMedia = Array.from(new Set(mediaToDestroy.map(m => JSON.stringify(m)))).map(s => JSON.parse(s));
+
     // === 2. EXECUTE CLOUDINARY CLEANUP ===
-    for (const item of mediaToDestroy) {
+    for (const item of uniqueMedia) {
       try {
-        await cloudinary.uploader.destroy(item.id, { resource_type: item.type });
-        console.log(`🗑  [Cloudinary] Deleted ${item.type}: ${item.id}`);
+        const result = await cloudinary.uploader.destroy(item.id, { resource_type: item.type });
+        console.log(`🗑  [Cloudinary] Deleted ${item.type}: ${item.id} | Result: ${result.result}`);
       } catch (err) {
-        console.error(`❌ [Cloudinary] Cleanup failed for ${item.id}:`, err.message);
+        console.error(`❌ [Cloudinary] Cleanup failed for ${item.id} (${item.type}):`, err.message);
       }
     }
 
