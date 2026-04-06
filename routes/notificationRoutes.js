@@ -2,6 +2,47 @@ const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/authMiddleware");
 const Notification = require("../models/Notification");
+const User = require("../models/User");
+
+// @route   POST api/notifications/feedback
+// @desc    Submit user feedback to Main Admin
+// @access  Private
+router.post("/feedback", auth, async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message) return res.status(400).json({ message: "Message is required" });
+
+        // Find Main Admin
+        const mainAdmin = await User.findOne({ isMainAdmin: true });
+        if (!mainAdmin) {
+            return res.status(404).json({ message: "Main Admin not found" });
+        }
+
+        const newNotification = new Notification({
+            sender: req.user._id,
+            receiver: mainAdmin._id,
+            type: "feedback",
+            message: message,
+        });
+
+        await newNotification.save();
+
+        // Populate sender info for real-time update
+        const populatedNotification = await Notification.findById(newNotification._id)
+            .populate("sender", "name profilePicture");
+
+        // Real-time update via socket
+        const io = req.app.get("socketio");
+        if (io) {
+            io.to(mainAdmin._id.toString()).emit("newNotification", populatedNotification);
+        }
+
+        res.status(201).json({ message: "Feedback submitted successfully" });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("Server Error");
+    }
+});
 
 // @route   GET api/notifications
 // @desc    Get all notifications for current user
