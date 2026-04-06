@@ -103,6 +103,11 @@ router.post("/config", authenticate, verifyMainAdmin, async (req, res) => {
         if (rolloverDate !== undefined) config.rolloverDate = rolloverDate;
 
         await config.save();
+
+        if (req.io) {
+            req.io.emit("pointsConfigUpdated", config);
+        }
+
         res.json({ message: "Configuration updated", config });
     } catch (error) {
         res.status(500).json({ message: "Failed to update config" });
