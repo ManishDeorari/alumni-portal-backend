@@ -49,6 +49,37 @@ router.get("/all-users", authenticate, verifyAdmin, async (req, res) => {
   }
 });
 
+// ✅ 1.6 Send notice to users (Bulk/Single Admins)
+router.post("/send-notice", authenticate, verifyAdmin, async (req, res) => {
+  const { userIds, message } = req.body;
+  if (!userIds || !Array.isArray(userIds) || !message) {
+    return res.status(400).json({ message: "userIds (array) and message (string) are required" });
+  }
+
+  try {
+    const notifications = userIds.map(id => ({
+      sender: req.user._id,
+      receiver: id,
+      type: "admin_notice",
+      message: message,
+    }));
+
+    const createdNotifications = await Notification.insertMany(notifications);
+
+    // Socket.io for real-time update
+    if (req.io) {
+      createdNotifications.forEach(note => {
+        req.io.to(note.receiver.toString()).emit("newNotification", note);
+      });
+    }
+
+    res.json({ message: `Notice sent to ${userIds.length} users successfully.` });
+  } catch (err) {
+    console.error("Send notice error:", err);
+    res.status(500).json({ message: "Failed to send notice" });
+  }
+});
+
 // ✅ 2️⃣ Approve a specific user
 router.put("/approve/:id", authenticate, verifyAdmin, async (req, res) => {
   try {
