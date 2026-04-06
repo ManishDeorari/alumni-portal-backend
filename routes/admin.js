@@ -500,7 +500,7 @@ router.get("/admins", authenticate, verifyAdmin, async (req, res) => {
     const users = await User.find({
       role: { $in: ["faculty", "admin"] },
       isMainAdmin: { $ne: true }, // ✅ exclude main admin
-    }).select("name email role isAdmin");
+    }).select("name email role isAdmin employeeId");
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch admins" });
