@@ -7,7 +7,8 @@ module.exports = async (req, res) => {
       return res.json([]);
     }
 
-    const query = {
+    // Base filter with search query
+    const filter = {
       $or: [
         { name: { $regex: q, $options: "i" } },
         { publicId: { $regex: q, $options: "i" } },
@@ -15,12 +16,12 @@ module.exports = async (req, res) => {
       ]
     };
 
+    // Apply role filter if provided
     if (role) {
-      query.role = role;
+      filter.role = role;
     }
 
-    // Search by name, publicId or enrollmentNumber
-    const users = await User.find(query)
+    const users = await User.find(filter)
     .select("name publicId enrollmentNumber profilePicture role")
     .limit(10);
 
