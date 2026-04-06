@@ -588,7 +588,7 @@ router.get("/export-alumni", authenticate, verifyAdmin, async (req, res) => {
     if (industry) filter["workProfile.industry"] = { $regex: new RegExp(industry, "i") };
 
     const users = await User.find(filter)
-      .select("name email enrollmentNumber phone whatsapp linkedin address education experience workProfile jobPreferences course year")
+      .select("publicId name email enrollmentNumber phone whatsapp linkedin address education experience workProfile jobPreferences course year")
       .sort({ name: 1 });
 
     res.json(users);
