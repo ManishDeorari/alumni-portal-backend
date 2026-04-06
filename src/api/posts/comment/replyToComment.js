@@ -73,6 +73,12 @@ const replyToComment = async (req, res) => {
             if (req.io) {
               const populatedNote = await Notification.findById(pointsNotification._id).populate("sender", "name profilePicture");
               req.io.to(user._id.toString()).emit("newNotification", populatedNote);
+
+              // ✅ ALSO EMIT pointsUpdated FOR THE LIVE TOAST & SYNC
+              req.io.to(user._id.toString()).emit("pointsUpdated", {
+                awardedPoints: pts,
+                reason: "Replied to Comment"
+              });
             }
             console.log(`✅ Awarded ${pts} points to user ${user.name} for replying to a comment.`);
         } else {
