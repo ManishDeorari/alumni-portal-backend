@@ -32,9 +32,8 @@ router.post("/feedback", auth, async (req, res) => {
             .populate("sender", "name profilePicture");
 
         // Real-time update via socket
-        const io = req.app.get("socketio");
-        if (io) {
-            io.to(mainAdmin._id.toString()).emit("newNotification", populatedNotification);
+        if (req.io) {
+            req.io.to(mainAdmin._id.toString()).emit("newNotification", populatedNotification);
         }
 
         res.status(201).json({ message: "Feedback submitted successfully" });
