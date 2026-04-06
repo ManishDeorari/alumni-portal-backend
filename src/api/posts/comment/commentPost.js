@@ -50,37 +50,53 @@ const commentPost = async (req, res) => {
         const User = require("../../../../models/User");
         const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
         const user = await User.findById(userId);
-        const config = (await PointsSystemConfig.findOne()) || { commentPoints: 3 };
+        const config = (await PointsSystemConfig.findOne()) || { 
+            commentPoints: 3, 
+            commentLimitCount: 5, 
+            commentLimitDays: 1 
+        };
 
-        if (!user.points) user.points = { total: 0 };
-        const pts = config.commentPoints || 3;
+        const now = new Date();
+        const limitMs = (config.commentLimitDays || 1) * 24 * 60 * 60 * 1000;
+        const recentLogs = (user.commentPointLogs || []).filter(date => (now - new Date(date)) < limitMs);
 
-        user.points.total = (user.points.total || 0) + pts;
-        user.points.comments = (user.points.comments || 0) + pts;
-        user.points.contentContribution = (user.points.contentContribution || 0) + pts;
+        if (recentLogs.length < (config.commentLimitCount || 5)) {
+            if (!user.points) user.points = { total: 0 };
+            const pts = config.commentPoints || 3;
 
-        await user.save();
+            user.points.total = (user.points.total || 0) + pts;
+            user.points.comments = (user.points.comments || 0) + pts;
+            user.points.contentContribution = (user.points.contentContribution || 0) + pts;
 
-        // ✅ Notification for points
-        try {
-          const Notification = require("../../../../models/Notification");
-          const newNotification = new Notification({
-            sender: user._id,
-            receiver: user._id,
-            type: "points_earned",
-            message: `You earned ${pts} points by Comment.`,
-          });
-          await newNotification.save();
+            // Update logs
+            if (!user.commentPointLogs) user.commentPointLogs = [];
+            user.commentPointLogs.push(now);
 
-          if (req.io) {
-            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-            req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
-          }
-        } catch (noteErr) {
-          console.error("❌ Failed to send comment award notice:", noteErr.message);
+            await user.save();
+
+            // ✅ Notification for points
+            try {
+              const Notification = require("../../../../models/Notification");
+              const newNotification = new Notification({
+                sender: user._id,
+                receiver: user._id,
+                type: "points_earned",
+                message: `You earned ${pts} points by Comment.`,
+              });
+              await newNotification.save();
+
+              if (req.io) {
+                const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+                req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
+              }
+            } catch (noteErr) {
+              console.error("❌ Failed to send comment award notice:", noteErr.message);
+            }
+
+            console.log(`✅ Awarded ${pts} points to user ${user.name} for commenting.`);
+        } else {
+            console.log(`ℹ️ Comment limit reached for user ${user.name}, no points awarded.`);
         }
-
-        console.log(`✅ Awarded ${pts} points to user ${user.name} for commenting.`);
       } catch (awardErr) {
         console.error("❌ Failed to award points for comment:", awardErr.message);
       }

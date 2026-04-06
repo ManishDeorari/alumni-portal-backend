@@ -145,6 +145,8 @@ const UserSchema = new mongoose.Schema(
 
     // Tracking for points (Alumni only)
     postPointLogs: [{ type: Date }], // Dates when post points were awarded
+    likePointLogs: [{ type: Date }], // Dates when like points were awarded
+    commentPointLogs: [{ type: Date }], // Dates when comment points were awarded
     profileCompletionAwarded: { type: Boolean, default: false },
 
     // Notifications

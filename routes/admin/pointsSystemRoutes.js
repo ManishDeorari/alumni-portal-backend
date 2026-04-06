@@ -24,8 +24,42 @@ router.get("/config", authenticate, async (req, res) => {
         if (!config) {
             config = await PointsSystemConfig.create({});
         }
-        res.json(config);
+
+        // Calculate user status if authenticated
+        let userStatus = {
+            isProfileComplete: false,
+            isPostLimitReached: false,
+            isLikeLimitReached: false,
+            isCommentLimitReached: false
+        };
+
+        if (req.user) {
+            const user = await User.findById(req.user._id);
+            if (user) {
+                userStatus.isProfileComplete = !!user.profileCompletionAwarded;
+
+                const now = new Date();
+                
+                // Post Limit Status
+                const postLimitMs = (config.postLimitDays || 7) * 24 * 60 * 60 * 1000;
+                const recentPostLogs = (user.postPointLogs || []).filter(date => (now - new Date(date)) < postLimitMs);
+                userStatus.isPostLimitReached = recentPostLogs.length >= (config.postLimitCount || 3);
+
+                // Like Limit Status
+                const likeLimitMs = (config.likeLimitDays || 1) * 24 * 60 * 60 * 1000;
+                const recentLikeLogs = (user.likePointLogs || []).filter(date => (now - new Date(date)) < likeLimitMs);
+                userStatus.isLikeLimitReached = recentLikeLogs.length >= (config.likeLimitCount || 10);
+
+                // Comment Limit Status
+                const commentLimitMs = (config.commentLimitDays || 1) * 24 * 60 * 60 * 1000;
+                const recentCommentLogs = (user.commentPointLogs || []).filter(date => (now - new Date(date)) < commentLimitMs);
+                userStatus.isCommentLimitReached = recentCommentLogs.length >= (config.commentLimitCount || 5);
+            }
+        }
+
+        res.json({ ...config.toObject(), userStatus });
     } catch (error) {
+        console.error("Points Config Fetch Error:", error);
         res.status(500).json({ message: "Failed to fetch config" });
     }
 });
@@ -42,6 +76,10 @@ router.post("/config", authenticate, verifyMainAdmin, async (req, res) => {
             sessionPoints, 
             postLimitCount, 
             postLimitDays, 
+            likeLimitCount,
+            likeLimitDays,
+            commentLimitCount,
+            commentLimitDays,
             rolloverDate 
         } = req.body;
 
@@ -58,6 +96,10 @@ router.post("/config", authenticate, verifyMainAdmin, async (req, res) => {
         if (sessionPoints !== undefined) config.sessionPoints = sessionPoints;
         if (postLimitCount !== undefined) config.postLimitCount = postLimitCount;
         if (postLimitDays !== undefined) config.postLimitDays = postLimitDays;
+        if (likeLimitCount !== undefined) config.likeLimitCount = likeLimitCount;
+        if (likeLimitDays !== undefined) config.likeLimitDays = likeLimitDays;
+        if (commentLimitCount !== undefined) config.commentLimitCount = commentLimitCount;
+        if (commentLimitDays !== undefined) config.commentLimitDays = commentLimitDays;
         if (rolloverDate !== undefined) config.rolloverDate = rolloverDate;
 
         await config.save();

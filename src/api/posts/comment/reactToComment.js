@@ -46,29 +46,46 @@ const reactToComment = async (req, res) => {
         const User = require("../../../../models/User");
         const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
         const user = await User.findById(userId);
-        const config = (await PointsSystemConfig.findOne()) || { likePoints: 2 };
+        const config = (await PointsSystemConfig.findOne()) || { 
+            likePoints: 2, 
+            likeLimitCount: 10, 
+            likeLimitDays: 1 
+        };
 
-        if (!user.points) user.points = { total: 0 };
-        const pts = config.likePoints || 2;
+        const now = new Date();
+        const limitMs = (config.likeLimitDays || 1) * 24 * 60 * 60 * 1000;
+        const recentLogs = (user.likePointLogs || []).filter(date => (now - new Date(date)) < limitMs);
 
-        user.points.total = (user.points.total || 0) + pts;
-        user.points.likes = (user.points.likes || 0) + pts;
-        user.points.studentEngagement = (user.points.studentEngagement || 0) + pts;
+        if (recentLogs.length < (config.likeLimitCount || 10)) {
+            if (!user.points) user.points = { total: 0 };
+            const pts = config.likePoints || 2;
 
-        await user.save();
+            user.points.total = (user.points.total || 0) + pts;
+            user.points.likes = (user.points.likes || 0) + pts;
+            user.points.studentEngagement = (user.points.studentEngagement || 0) + pts;
 
-        const Notification = require("../../../../models/Notification");
-        const pointsNotification = new Notification({
-          sender: user._id,
-          receiver: user._id,
-          type: "points_earned",
-          message: `You earned ${pts} points by Like.`,
-        });
-        await pointsNotification.save();
+            // Update logs
+            if (!user.likePointLogs) user.likePointLogs = [];
+            user.likePointLogs.push(now);
 
-        if (req.io) {
-          const populatedNote = await Notification.findById(pointsNotification._id).populate("sender", "name profilePicture");
-          req.io.to(user._id.toString()).emit("newNotification", populatedNote);
+            await user.save();
+
+            const Notification = require("../../../../models/Notification");
+            const pointsNotification = new Notification({
+              sender: user._id,
+              receiver: user._id,
+              type: "points_earned",
+              message: `You earned ${pts} points by Like.`,
+            });
+            await pointsNotification.save();
+
+            if (req.io) {
+              const populatedNote = await Notification.findById(pointsNotification._id).populate("sender", "name profilePicture");
+              req.io.to(user._id.toString()).emit("newNotification", populatedNote);
+            }
+            console.log(`✅ Awarded ${pts} points to user ${user.name} for reacting to a comment.`);
+        } else {
+            console.log(`ℹ️ Like limit reached for user ${user.name}, no points awarded.`);
         }
       } catch (awardErr) {
         console.error("❌ Failed to award points for comment reaction:", awardErr.message);
