@@ -69,7 +69,14 @@ router.post("/send-notice", authenticate, verifyAdmin, async (req, res) => {
     // Socket.io for real-time update
     if (req.io) {
       createdNotifications.forEach(note => {
-        req.io.to(note.receiver.toString()).emit("newNotification", note);
+        // Converting to a plain object and manually attaching sender info for immediate UX
+        const populatedNote = note.toObject();
+        populatedNote.sender = {
+          _id: req.user._id,
+          name: req.user.name,
+          profilePicture: req.user.profilePicture
+        };
+        req.io.to(note.receiver.toString()).emit("newNotification", populatedNote);
       });
     }
 
