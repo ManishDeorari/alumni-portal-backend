@@ -129,12 +129,6 @@ module.exports = async (req, res) => {
           if (req.io) {
             const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
             req.io.to(updatedUser._id.toString()).emit("newNotification", populatedNotification);
-
-            // ✅ ALSO EMIT pointsUpdated FOR THE LIVE TOAST & SYNC
-            req.io.to(updatedUser._id.toString()).emit("pointsUpdated", {
-              awardedPoints: awardAmount,
-              reason: "Profile Completed"
-            });
           }
         } catch (noteErr) {
           console.error("❌ Failed to send profile completion award notice:", noteErr.message);

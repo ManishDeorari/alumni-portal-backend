@@ -132,13 +132,9 @@ const createPost = async (req, res) => {
 
             if (req.io) {
               const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-              req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
-
-              // ✅ ALSO EMIT pointsUpdated FOR THE LIVE TOAST & SYNC
-              req.io.to(user._id.toString()).emit("pointsUpdated", {
-                awardedPoints: config.postPoints || 10,
-                reason: "Post Created"
-              });
+              const targetRoom = user._id.toString();
+              req.io.to(targetRoom).emit("newNotification", populatedNotification);
+              req.io.to(targetRoom).emit("liveNotification", populatedNotification);
             }
           } catch (noteErr) {
             console.error("❌ Failed to send post placement award notice:", noteErr.message);

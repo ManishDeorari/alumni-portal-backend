@@ -81,7 +81,9 @@ const reactToComment = async (req, res) => {
 
             if (req.io) {
               const populatedNote = await Notification.findById(pointsNotification._id).populate("sender", "name profilePicture");
-              req.io.to(user._id.toString()).emit("newNotification", populatedNote);
+              const targetRoom = user._id.toString();
+              req.io.to(targetRoom).emit("newNotification", populatedNote);
+              req.io.to(targetRoom).emit("liveNotification", populatedNote);
             }
             console.log(`✅ Awarded ${pts} points to user ${user.name} for reacting to a comment.`);
         } else {
@@ -108,6 +110,7 @@ const reactToComment = async (req, res) => {
       if (req.io) {
         const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
         req.io.to(commentOwnerId).emit("newNotification", populatedNotification);
+        req.io.to(commentOwnerId).emit("liveNotification", populatedNotification);
       }
     }
 

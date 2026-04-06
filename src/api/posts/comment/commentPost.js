@@ -40,7 +40,9 @@ const commentPost = async (req, res) => {
 
       if (req.io) {
         const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-        req.io.to(updatedPost.user._id.toString()).emit("newNotification", populatedNotification);
+        const targetOwnerRoom = updatedPost.user._id.toString();
+        req.io.to(targetOwnerRoom).emit("newNotification", populatedNotification);
+        req.io.to(targetOwnerRoom).emit("liveNotification", populatedNotification);
       }
     }
 
@@ -87,13 +89,9 @@ const commentPost = async (req, res) => {
 
               if (req.io) {
                 const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-                req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
-
-                // ✅ ALSO EMIT pointsUpdated FOR THE LIVE TOAST & SYNC
-                req.io.to(user._id.toString()).emit("pointsUpdated", {
-                  awardedPoints: pts,
-                  reason: "Commented on Post"
-                });
+                const targetRoom = user._id.toString();
+                req.io.to(targetRoom).emit("newNotification", populatedNotification);
+                req.io.to(targetRoom).emit("liveNotification", populatedNotification);
               }
             } catch (noteErr) {
               console.error("❌ Failed to send comment award notice:", noteErr.message);
