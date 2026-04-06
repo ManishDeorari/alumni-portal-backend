@@ -33,7 +33,17 @@ router.get("/config", authenticate, async (req, res) => {
 // UPDATE points configuration (Main Admin only)
 router.post("/config", authenticate, verifyMainAdmin, async (req, res) => {
     try {
-        const { profileCompletionPoints, connectionPoints, postPoints, sessionPoints, postLimitCount, postLimitDays, rolloverDate } = req.body;
+        const { 
+            profileCompletionPoints, 
+            connectionPoints, 
+            postPoints, 
+            likePoints,
+            commentPoints,
+            sessionPoints, 
+            postLimitCount, 
+            postLimitDays, 
+            rolloverDate 
+        } = req.body;
 
         let config = await PointsSystemConfig.findOne();
         if (!config) {
@@ -43,6 +53,8 @@ router.post("/config", authenticate, verifyMainAdmin, async (req, res) => {
         if (profileCompletionPoints !== undefined) config.profileCompletionPoints = profileCompletionPoints;
         if (connectionPoints !== undefined) config.connectionPoints = connectionPoints;
         if (postPoints !== undefined) config.postPoints = postPoints;
+        if (likePoints !== undefined) config.likePoints = likePoints;
+        if (commentPoints !== undefined) config.commentPoints = commentPoints;
         if (sessionPoints !== undefined) config.sessionPoints = sessionPoints;
         if (postLimitCount !== undefined) config.postLimitCount = postLimitCount;
         if (postLimitDays !== undefined) config.postLimitDays = postLimitDays;
