@@ -2,19 +2,25 @@ const User = require("../../../../models/User");
 
 module.exports = async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q, role } = req.query;
     if (!q) {
       return res.json([]);
     }
 
-    // Search by name or publicId
-    const users = await User.find({
+    const query = {
       $or: [
         { name: { $regex: q, $options: "i" } },
         { publicId: { $regex: q, $options: "i" } },
         { enrollmentNumber: { $regex: q, $options: "i" } }
       ]
-    })
+    };
+
+    if (role) {
+      query.role = role;
+    }
+
+    // Search by name, publicId or enrollmentNumber
+    const users = await User.find(query)
     .select("name publicId enrollmentNumber profilePicture role")
     .limit(10);
 
