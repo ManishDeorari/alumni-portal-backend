@@ -26,6 +26,19 @@ const verifyAdmin = async (req, res, next) => {
   }
 };
 
+// ✅ Middleware to check main admin access
+const verifyMainAdmin = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user || !user.isMainAdmin) {
+      return res.status(403).json({ message: "Access denied. Main Admin only." });
+    }
+    next();
+  } catch (err) {
+    res.status(500).json({ message: "Server error verifying main admin." });
+  }
+};
+
 // ✅ 1️⃣ Get all pending users (faculty/alumni waiting for approval)
 router.get("/pending-users", authenticate, verifyAdmin, async (req, res) => {
   try {
@@ -39,8 +52,8 @@ router.get("/pending-users", authenticate, verifyAdmin, async (req, res) => {
   }
 });
 
-// ✅ 1.5 Get all users (for User Management tab)
-router.get("/all-users", authenticate, verifyAdmin, async (req, res) => {
+// ✅ 1.5 Get all users (for User Management tab) - RESTRICTED TO MAIN ADMIN
+router.get("/all-users", authenticate, verifyAdmin, verifyMainAdmin, async (req, res) => {
   try {
     const users = await User.find({}).select("-password").sort({ name: 1 });
     res.json(users);
@@ -107,8 +120,8 @@ router.put("/approve/:id", authenticate, verifyAdmin, async (req, res) => {
   }
 });
 
-// ✅ 3️⃣ Promote a faculty to Admin
-router.put("/make-admin/:id", authenticate, verifyAdmin, async (req, res) => {
+// ✅ 3️⃣ Promote a faculty to Admin - RESTRICTED TO MAIN ADMIN
+router.put("/make-admin/:id", authenticate, verifyAdmin, verifyMainAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -156,8 +169,8 @@ router.put("/make-admin/:id", authenticate, verifyAdmin, async (req, res) => {
   }
 });
 
-// ✅ 4️⃣ Demote an Admin back to Faculty
-router.put("/remove-admin/:id", authenticate, verifyAdmin, async (req, res) => {
+// ✅ 4️⃣ Demote an Admin back to Faculty - RESTRICTED TO MAIN ADMIN
+router.put("/remove-admin/:id", authenticate, verifyAdmin, verifyMainAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -440,8 +453,8 @@ router.delete("/delete-user/:id", authenticate, verifyAdmin, async (req, res) =>
   res.json({ message: `${result.name} and all their data/media have been deleted.` });
 });
 
-// ✅ 5.5 Bulk Delete Users
-router.post("/delete-users-bulk", authenticate, verifyAdmin, async (req, res) => {
+// ✅ 5.5 Bulk Delete Users - RESTRICTED TO MAIN ADMIN
+router.post("/delete-users-bulk", authenticate, verifyAdmin, verifyMainAdmin, async (req, res) => {
   const { userIds } = req.body;
   if (!userIds || !Array.isArray(userIds)) {
     return res.status(400).json({ message: "Invalid user IDs" });
