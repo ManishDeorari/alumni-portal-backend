@@ -283,6 +283,53 @@ router.post("/trigger-rollover", authenticate, verifyMainAdmin, async (req, res)
             user.postPointLogs = [];
             user.profileCompletionAwarded = false;
 
+            // Re-evaluate profile completion for the new year
+            const hasProfilePic = user.profilePicture && !user.profilePicture.includes("default-profile.jpg");
+            const hasBanner = user.bannerImage && !user.bannerImage.includes("default_banner.jpg");
+            const hasPhone = user.phone && user.phone !== "Not provided";
+            const hasAddress = user.address && user.address !== "Not set";
+            const hasWhatsApp = user.whatsapp && user.whatsapp !== "Not linked";
+            const hasLinkedIn = user.linkedin && user.linkedin !== "Not linked";
+            const hasBio = user.bio && user.bio.trim().length > 0;
+
+            const MANDATORY_DEGREES = [
+                "High School (Secondary - Class 10)",
+                "Intermediate (Higher Secondary - Class 11-12)",
+                "Undergraduate (Bachelor's Degree)",
+                "Postgraduate (Master's Degree)"
+            ];
+
+            const userEducations = user.education || [];
+            const completedMandatoryCount = MANDATORY_DEGREES.filter(degree => {
+                const found = userEducations.find(e => e.level === degree || e.degree === degree);
+                return found && found.institution && found.startDate && found.endDate;
+            }).length;
+
+            const hasEducation = completedMandatoryCount >= 3;
+
+            const isCompleted = hasProfilePic && hasBanner && hasPhone && hasAddress &&
+                hasWhatsApp && hasLinkedIn && hasBio && hasEducation;
+
+            if (isCompleted) {
+                const awardAmount = config ? (config.profileCompletionPoints || 50) : 50;
+                user.points.total = awardAmount;
+                user.points.profileCompletion = awardAmount;
+                user.profileCompletionAwarded = true;
+                
+                try {
+                    const Notification = require("../../models/Notification");
+                    const newNotification = new Notification({
+                        sender: user._id, 
+                        receiver: user._id,
+                        type: "points_earned",
+                        message: `You earned ${awardAmount} points by Profile completion.`,
+                    });
+                    await newNotification.save();
+                } catch (noteErr) {
+                    console.error("Failed to re-award profile completion notice on rollover:", noteErr.message);
+                }
+            }
+
             await user.save();
         }
 
