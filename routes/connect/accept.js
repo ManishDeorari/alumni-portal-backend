@@ -42,22 +42,36 @@ router.post("/", authenticate, async (req, res) => {
     if (!myConnStr.includes(from)) receiver.connections.push(from);
     if (!senderConnStr.includes(to.toString())) sender.connections.push(to);
 
-    // Notification
+    // Notification for the requester (Sender)
     const Notification = require("../../models/Notification");
-    const newNotification = new Notification({
+    const acceptNoteForSender = new Notification({
       sender: to,
       receiver: from,
       type: "connect_accept",
       message: `${receiver.name} accepted your connection request`,
     });
-    await newNotification.save();
+    await acceptNoteForSender.save();
 
-    // Emit socket event to the sender's room
+    // Reciprocal Notification for the acceptor (Current User)
+    const acceptNoteForReceiver = new Notification({
+      sender: from,
+      receiver: to,
+      type: "connect_accept",
+      message: `You are now connected with ${sender.name}`,
+    });
+    await acceptNoteForReceiver.save();
+
+    // Emit socket events
     if (req.io) {
-      const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-      const targetRoom = from.toString();
-      req.io.to(targetRoom).emit("newNotification", populatedNotification);
-      req.io.to(targetRoom).emit("liveNotification", populatedNotification);
+      // Notify the requester
+      const populatedSenderNote = await Notification.findById(acceptNoteForSender._id).populate("sender", "name profilePicture");
+      req.io.to(from.toString()).emit("newNotification", populatedSenderNote);
+      req.io.to(from.toString()).emit("liveNotification", populatedSenderNote);
+
+      // Notify the acceptor (live update for their own feed/preview)
+      const populatedReceiverNote = await Notification.findById(acceptNoteForReceiver._id).populate("sender", "name profilePicture");
+      req.io.to(to.toString()).emit("newNotification", populatedReceiverNote);
+      req.io.to(to.toString()).emit("liveNotification", populatedReceiverNote);
     }
 
     await receiver.save();
