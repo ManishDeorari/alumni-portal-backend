@@ -214,13 +214,15 @@ router.post("/manual-penalty", authenticate, verifyMainAdmin, async (req, res) =
 
         user.points.total = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
 
+        await user.save();
+
         // Add notice notification
         try {
             const Notification = require("../../models/Notification");
             const newNotification = new Notification({
                 sender: req.user._id,
                 receiver: user._id,
-                type: "admin_notice",
+                type: "points_earned",
                 message: `MANUAL_PENALTY::${message || "Points Deducted"}::penalty::${amount}`,
             });
             await newNotification.save();
