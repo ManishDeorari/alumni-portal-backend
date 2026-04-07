@@ -152,6 +152,8 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
 
         user.points.total = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
 
+        await user.save();
+
         // Add notification using Notification model
         try {
             const Notification = require("../../models/Notification");
