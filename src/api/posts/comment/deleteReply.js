@@ -13,8 +13,34 @@ const deleteReply = async (req, res) => {
     const reply = comment.replies.id(replyId);
     if (!reply) return res.status(404).json({ message: "Reply not found" });
 
-    if (reply.user.toString() !== req.user._id.toString()) {
+    const User = require("../../../../models/User");
+    const currentUser = await User.findById(req.user._id || req.user.id);
+    const isAdmin = currentUser && (currentUser.isMainAdmin || currentUser.role === 'admin');
+
+    if (reply.user.toString() !== req.user._id.toString() && !isAdmin) {
       return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Handle Admin notification if deleting someone else's reply
+    if (isAdmin && reply.user.toString() !== req.user._id.toString()) {
+      try {
+        const Notification = require("../../../../models/Notification");
+        const adminNote = new Notification({
+          sender: req.user._id,
+          receiver: reply.user,
+          type: "admin_notice",
+          message: `Your reply on a post has been removed by the Admin for violating community guidelines.`,
+        });
+        await adminNote.save();
+        if (req.io) {
+          const populatedNotification = await Notification.findById(adminNote._id).populate("sender", "name profilePicture");
+          const targetRoom = reply.user.toString();
+          req.io.to(targetRoom).emit("newNotification", populatedNotification);
+          req.io.to(targetRoom).emit("liveNotification", populatedNotification);
+        }
+      } catch (noteErr) {
+        console.error("❌ Failed to send admin deletion notice:", noteErr.message);
+      }
     }
 
     comment.replies = comment.replies.filter(
