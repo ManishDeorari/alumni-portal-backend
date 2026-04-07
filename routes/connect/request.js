@@ -57,7 +57,9 @@ router.post("/", authenticate, async (req, res) => {
     // Emit socket event to the receiver's room
     if (req.io) {
       const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-      req.io.to(to.toString()).emit("newNotification", populatedNotification);
+      const targetRoom = to.toString();
+      req.io.to(targetRoom).emit("newNotification", populatedNotification);
+      req.io.to(targetRoom).emit("liveNotification", populatedNotification);
     }
 
     await sender.save();

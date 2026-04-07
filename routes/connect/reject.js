@@ -27,6 +27,24 @@ router.post("/", authenticate, async (req, res) => {
     await receiver.save();
     await sender.save();
 
+    // Notification to sender that the request was rejected
+    const Notification = require("../../models/Notification");
+    const newNotification = new Notification({
+      sender: to,
+      receiver: from,
+      type: "connect_reject",
+      message: `${receiver.name} declined your connection request`,
+    });
+    await newNotification.save();
+
+    // Emit socket event to the sender's room
+    if (req.io) {
+      const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+      const targetRoom = from.toString();
+      req.io.to(targetRoom).emit("newNotification", populatedNotification);
+      req.io.to(targetRoom).emit("liveNotification", populatedNotification);
+    }
+
     res.status(200).json({ message: "Connection request rejected" });
   } catch (err) {
     console.error("Reject Error:", err);

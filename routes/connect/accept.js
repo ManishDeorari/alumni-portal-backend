@@ -55,7 +55,9 @@ router.post("/", authenticate, async (req, res) => {
     // Emit socket event to the sender's room
     if (req.io) {
       const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-      req.io.to(from.toString()).emit("newNotification", populatedNotification);
+      const targetRoom = from.toString();
+      req.io.to(targetRoom).emit("newNotification", populatedNotification);
+      req.io.to(targetRoom).emit("liveNotification", populatedNotification);
     }
 
     await receiver.save();
@@ -91,7 +93,9 @@ router.post("/", authenticate, async (req, res) => {
 
           if (req.io) {
             const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
-            req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
+            const targetRoom = user._id.toString();
+            req.io.to(targetRoom).emit("newNotification", populatedNotification);
+            req.io.to(targetRoom).emit("liveNotification", populatedNotification);
           }
         } catch (noteErr) {
           console.error("❌ Failed to send networking award notice:", noteErr.message);
