@@ -147,7 +147,7 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
             "profileCompletion", "studentEngagement", "referrals",
             "contentContribution", "campusEngagement", "innovationSupport",
             "alumniParticipation", "connections", "posts", "comments",
-            "likes", "replies", "other"
+            "likes", "replies", "penalty", "other"
         ];
 
         user.points.total = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
@@ -174,6 +174,70 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
         res.json({ message: "Points awarded successfully", user: { name: user.name, totalPoints: user.points.total } });
     } catch (error) {
         res.status(500).json({ message: "Server error awarding points" });
+    }
+});
+
+// Manual penalty points (Main Admin only)
+router.post("/manual-penalty", authenticate, verifyMainAdmin, async (req, res) => {
+    try {
+        const { search, amount, message } = req.body; 
+
+        if (!search || !amount) {
+            return res.status(400).json({ message: "Search term and amount required" });
+        }
+
+        const user = await User.findOne({
+            $or: [
+                { name: search },
+                { enrollmentNumber: search }
+            ],
+            role: "alumni"
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: "Alumni not found" });
+        }
+
+        if (!user.points) user.points = { total: 0 };
+
+        const penaltyAmount = Number(amount);
+        // Subtract from penalty category (as a negative value or just subtract from total)
+        // User wants "penalty" shown in breakdown, so we'll store it as a negative number in the penalty field
+        user.points.penalty = (user.points.penalty || 0) - penaltyAmount;
+
+        const categories = [
+            "profileCompletion", "studentEngagement", "referrals",
+            "contentContribution", "campusEngagement", "innovationSupport",
+            "alumniParticipation", "connections", "posts", "comments",
+            "likes", "replies", "penalty", "other"
+        ];
+
+        user.points.total = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
+
+        // Add notice notification
+        try {
+            const Notification = require("../../models/Notification");
+            const newNotification = new Notification({
+                sender: req.user._id,
+                receiver: user._id,
+                type: "admin_notice",
+                message: `MANUAL_PENALTY::${message || "Points Deducted"}::penalty::${amount}`,
+            });
+            await newNotification.save();
+
+            if (req.io) {
+                const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+                req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
+                req.io.to(user._id.toString()).emit("liveNotification", populatedNotification);
+            }
+        } catch (noteErr) {
+            console.error("❌ Failed to send manual penalty notice:", noteErr.message);
+        }
+
+        res.json({ message: "Points deducted successfully", user: { name: user.name, totalPoints: user.points.total } });
+    } catch (error) {
+        console.error("Manual Penalty Error:", error);
+        res.status(500).json({ message: "Server error penalizing points" });
     }
 });
 
@@ -238,7 +302,7 @@ router.post("/sync-points", authenticate, verifyMainAdmin, async (req, res) => {
             "profileCompletion", "studentEngagement", "referrals",
             "contentContribution", "campusEngagement", "innovationSupport",
             "alumniParticipation", "connections", "posts", "comments",
-            "likes", "replies", "other"
+            "likes", "replies", "penalty", "other"
         ];
 
         let syncedCount = 0;
