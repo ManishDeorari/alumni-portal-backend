@@ -9,6 +9,7 @@ const NotificationSchema = new mongoose.Schema({
     enum: [
       "connect_request", 
       "connect_accept", 
+      "connect_reject",
       "post_like", 
       "post_comment", 
       "comment_like", 
