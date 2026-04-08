@@ -51,14 +51,26 @@ if (process.env.ALLOWED_ORIGINS) {
   });
 }
 
+// ✅ Dynamic Vercel subdomain patterns (catches ALL preview/branch URLs)
+const vercelPatterns = [
+  /^https:\/\/alumni-portal-frontend[\w-]*\.vercel\.app$/,
+  /^https:\/\/alumni-frontend[\w-]*\.vercel\.app$/,
+  /^https:\/\/[\w-]*manishdeoraris-projects\.vercel\.app$/,
+];
+
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
     
-    // Check if origin matches allowed list or is a local/network IP
+    // 1. Check hardcoded list
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    // 2. Check dynamic Vercel patterns
+    if (vercelPatterns.some(pattern => pattern.test(origin))) return callback(null, true);
+
+    // 3. Check local/network IPs
     const isLocal = 
-      allowedOrigins.includes(origin) || 
       origin.startsWith("http://localhost:") || 
       origin.startsWith("http://127.0.0.1:") ||
       /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/.test(origin) ||
@@ -102,12 +114,21 @@ app.get("/", (req, res) => {
 // ✅ Use the port Render provides
 const PORT = process.env.PORT || 5000;
 
-// ✅ Connect to MongoDB
+// ✅ Connect to MongoDB FIRST, then start the server
 console.log("📡 Attempting MongoDB connection...");
 connectDB().then(async () => {
   await createMainAdmin(); // ensure main admin exists
   const User = require("./models/User");
   await User.syncIndexes();
+  console.log("✅ Database ready. Starting HTTP server...");
+
+  // ✅ Start Server ONLY after DB is connected
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+}).catch((err) => {
+  console.error("❌ Failed to initialize database:", err.message);
+  process.exit(1);
 });
 
 // ✅ Inject `io` into every request
@@ -187,7 +208,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Server Error" });
 });
 
-// ✅ Start Server
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+// ✅ Server is now started inside connectDB().then() above
