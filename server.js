@@ -30,8 +30,56 @@ const adminRoutes = require("./routes/admin");
 const notificationRoutes = require("./routes/notificationRoutes");
 const countRoutes = require("./routes/countRoutes");
 
+// ✅ CORS Configuration
+const allowedOrigins = [
+  "https://alumni-portal-frontend-khaki.vercel.app",
+  "https://alumni-frontend.vercel.app",
+  "https://alumni-portal-frontend-git-main-manishdeoraris-projects.vercel.app",
+  "https://alumni-portal-frontend-70ml39lrm-manishdeoraris-projects.vercel.app",
+  "https://alumni-portal-frontend-manishdeoraris-projects.vercel.app",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
+
+// Add origins from env if provided
+if (process.env.ALLOWED_ORIGINS) {
+  const envOrigins = process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim());
+  envOrigins.forEach(o => {
+    if (o && !allowedOrigins.includes(o)) {
+      allowedOrigins.push(o);
+    }
+  });
+}
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`⚠️ [CORS] Blocked request from unauthorized origin: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  exposedHeaders: ["set-cookie"],
+  maxAge: 86400 // 24 hours
+};
+
 const app = express();
 const server = http.createServer(app);
+
+// ✅ Apply CORS early
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
+const io = new Server(server, {
+  cors: corsOptions,
+});
 
 // ✅ NEW: Health Check Route (Before heavy middleware)
 app.get("/api/health", (req, res) => {
@@ -44,33 +92,6 @@ app.get("/", (req, res) => {
 
 // ✅ Use the port Render provides
 const PORT = process.env.PORT || 5000;
-
-// ✅ CORS Configuration
-const allowedOrigins = [
-  "https://alumni-portal-frontend-khaki.vercel.app",
-  "https://alumni-frontend.vercel.app",
-  "https://alumni-portal-frontend-git-main-manishdeoraris-projects.vercel.app",
-  "https://alumni-portal-frontend-70ml39lrm-manishdeoraris-projects.vercel.app",
-  "https://alumni-portal-frontend-manishdeoraris-projects.vercel.app",
-  "http://localhost:3000",
-];
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-const io = new Server(server, {
-  cors: corsOptions,
-});
 
 // ✅ Connect to MongoDB
 console.log("📡 Attempting MongoDB connection...");
@@ -121,8 +142,6 @@ io.on("connection", (socket) => {
 console.log("🟢 Middleware setup...");
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb", parameterLimit: 50000 }));
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
 
 
 

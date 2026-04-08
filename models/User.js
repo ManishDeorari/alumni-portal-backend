@@ -14,6 +14,7 @@ const PointsSchema = new mongoose.Schema({
   comments: { type: Number, default: 0 },
   replies: { type: Number, default: 0 },
   penalty: { type: Number, default: 0 },
+  login: { type: Number, default: 0 },
   other: { type: Number, default: 0 },
   total: { type: Number, default: 0 },
 });
@@ -149,6 +150,7 @@ const UserSchema = new mongoose.Schema(
     likePointLogs: [{ type: Date }], // Dates when like points were awarded
     commentPointLogs: [{ type: Date }], // Dates when comment points were awarded
     profileCompletionAwarded: { type: Boolean, default: false },
+    lastLoginPointAwardedAt: { type: Date }, // Tracking for daily login points
 
     // Notifications
     notifications: [NotificationSchema],
