@@ -30,6 +30,10 @@ const groupSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    allowAlumniMessaging: {
+        type: Boolean,
+        default: true,
+    },
     isAllMemberGroup: {
         type: Boolean,
         default: false,

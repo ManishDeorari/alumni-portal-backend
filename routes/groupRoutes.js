@@ -20,7 +20,7 @@ const checkAdmin = (req, res, next) => {
 // @desc    Create a new group (Admin only)
 router.post("/", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { name, description, profileImage, profileImagePublicId, profileImageSettings, isAllAlumniGroup, isAllFacultyGroup } = req.body;
+        const { name, description, profileImage, profileImagePublicId, profileImageSettings, isAllAlumniGroup, isAllFacultyGroup, allowAlumniMessaging, allowFacultyMessaging } = req.body;
         
         // 🛑 Check for unique name
         const existingGroup = await Group.findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
@@ -56,6 +56,8 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
             profileImagePublicId: profileImagePublicId || null,
             profileImageSettings: profileImageSettings || { x: 0, y: 0, zoom: 1, width: 100, height: 100 },
             members,
+            allowAlumniMessaging: allowAlumniMessaging !== undefined ? allowAlumniMessaging : true,
+            allowFacultyMessaging: allowFacultyMessaging !== undefined ? allowFacultyMessaging : false,
             admin: req.user.id
         });
 
@@ -185,9 +187,14 @@ router.post("/send", checkAuth, async (req, res) => {
             return res.status(403).json({ message: "Not a member of this group" });
         }
 
-        // Faculty restriction
-        if (!isAdmin && userRole === "faculty" && !group.allowFacultyMessaging) {
-            return res.status(403).json({ message: "Messaging is disabled for faculty in this group" });
+        // Messaging restrictions
+        if (!isAdmin) {
+            if (userRole === "faculty" && !group.allowFacultyMessaging) {
+                return res.status(403).json({ message: "Messaging is disabled for faculty in this group" });
+            }
+            if ((userRole === "alumni" || userRole === "user") && !group.allowAlumniMessaging) {
+                return res.status(403).json({ message: "Messaging is disabled for alumni in this group" });
+            }
         }
 
         const newMessage = new GroupMessage({
@@ -220,7 +227,7 @@ router.post("/send", checkAuth, async (req, res) => {
 // @desc    Update group settings (Admin only)
 router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
     try {
-        const { allowFacultyMessaging, description, name, profileImage, profileImagePublicId, profileImageSettings, oldImageUrl, isAllAlumni, isAllFaculty } = req.body;
+        const { allowFacultyMessaging, allowAlumniMessaging, description, name, profileImage, profileImagePublicId, profileImageSettings, oldImageUrl, isAllAlumni, isAllFaculty } = req.body;
         
         // 🛑 Check for unique name if it's being changed
         if (name) {
@@ -248,7 +255,7 @@ router.put("/:groupId/settings", checkAuth, checkAdmin, async (req, res) => {
             }
         }
 
-        const updateData = { allowFacultyMessaging, description, name };
+        const updateData = { allowFacultyMessaging, allowAlumniMessaging, description, name };
         if (profileImage !== undefined) updateData.profileImage = profileImage || "/default-group.jpg";
         if (profileImagePublicId !== undefined) updateData.profileImagePublicId = profileImagePublicId;
         if (profileImageSettings !== undefined) updateData.profileImageSettings = profileImageSettings;
