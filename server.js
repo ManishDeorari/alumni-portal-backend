@@ -60,14 +60,21 @@ const vercelPatterns = [
 
 const corsOptions = {
   origin: function (origin, callback) {
+    console.log(`📡 CORS Request from: ${origin || 'No Origin'}`);
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
     
     // 1. Check hardcoded list
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      console.log(`✅ CORS Match found in allowedOrigins: ${origin}`);
+      return callback(null, true);
+    }
 
     // 2. Check dynamic Vercel patterns
-    if (vercelPatterns.some(pattern => pattern.test(origin))) return callback(null, true);
+    if (vercelPatterns.some(pattern => pattern.test(origin))) {
+      console.log(`✅ CORS Match found in vercelPatterns: ${origin}`);
+      return callback(null, true);
+    }
 
     // 3. Check local/network IPs
     const isLocal = 
