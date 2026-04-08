@@ -56,7 +56,16 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.includes(origin)) {
+    // Check if origin matches allowed list or is a local/network IP
+    const isLocal = 
+      allowedOrigins.includes(origin) || 
+      origin.startsWith("http://localhost:") || 
+      origin.startsWith("http://127.0.0.1:") ||
+      /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/.test(origin) ||
+      /^http:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/.test(origin) ||
+      /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+(:\d+)?$/.test(origin);
+
+    if (isLocal) {
       callback(null, true);
     } else {
       console.warn(`⚠️ [CORS] Blocked request from unauthorized origin: ${origin}`);
