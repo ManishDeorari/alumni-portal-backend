@@ -29,7 +29,7 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
         }
         
         // 👥 Calculate Members
-        let members = req.body.members || [];
+        let members = Array.isArray(req.body.members) ? req.body.members : [];
         
         // 🔄 Automatic Role Inclusion
         if (isAllAlumniGroup || isAllFacultyGroup) {
@@ -56,7 +56,7 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
             profileImagePublicId: profileImagePublicId || null,
             profileImageSettings: profileImageSettings || { x: 0, y: 0, zoom: 1, width: 100, height: 100 },
             members,
-            allowAlumniMessaging: allowAlumniMessaging !== undefined ? allowAlumniMessaging : true,
+            allowAlumniMessaging: allowAlumniMessaging !== undefined ? allowAlumniMessaging : false,
             allowFacultyMessaging: allowFacultyMessaging !== undefined ? allowFacultyMessaging : false,
             admin: req.user.id
         });
@@ -189,10 +189,12 @@ router.post("/send", checkAuth, async (req, res) => {
 
         // Messaging restrictions
         if (!isAdmin) {
+            // Faculty check
             if (userRole === "faculty" && !group.allowFacultyMessaging) {
                 return res.status(403).json({ message: "Messaging is disabled for faculty in this group" });
             }
-            if ((userRole === "alumni" || userRole === "user") && !group.allowAlumniMessaging) {
+            // Alumni check
+            if (userRole === "alumni" && !group.allowAlumniMessaging) {
                 return res.status(403).json({ message: "Messaging is disabled for alumni in this group" });
             }
         }
