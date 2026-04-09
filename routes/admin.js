@@ -110,6 +110,29 @@ router.put("/approve/:id", authenticate, verifyAdmin, async (req, res) => {
     user.approved = true;
     await user.save();
 
+    // 🔔 Send Dashboard Notification
+    try {
+      const notice = new Notification({
+        sender: req.user._id,
+        receiver: user._id,
+        type: "account_approved",
+        message: "Your account has been approved! Welcome to the Alumni Portal community.",
+      });
+      await notice.save();
+
+      if (req.io) {
+        const populatedNote = notice.toObject();
+        populatedNote.sender = {
+          _id: req.user._id,
+          name: req.user.name,
+          profilePicture: req.user.profilePicture,
+        };
+        req.io.to(user._id.toString()).emit("newNotification", populatedNote);
+      }
+    } catch (err) {
+      console.error("Approval notice error:", err);
+    }
+
     // Send email notification (Non-blocking)
     sendApprovalEmail(user).catch(err => console.error("Failed to send approval email:", err.message));
 
@@ -145,7 +168,7 @@ router.put("/make-admin/:id", authenticate, verifyAdmin, verifyMainAdmin, async 
       const notice = new Notification({
         sender: req.user._id,
         receiver: user._id,
-        type: "admin_notice",
+        type: "promotion",
         message: `Congratulations! You have been promoted to Admin by the Master Control Center.`,
       });
       await notice.save();
@@ -189,8 +212,8 @@ router.put("/remove-admin/:id", authenticate, verifyAdmin, verifyMainAdmin, asyn
       const notice = new Notification({
         sender: req.user._id,
         receiver: user._id,
-        type: "admin_notice",
-        message: `Notice: Your administrative privileges have been revoked. You are now a Faculty member.`,
+        type: "demotion",
+        message: `Notice: Your administrative privileges have been revoked by the Master Control Center. You are now a Faculty member.`,
       });
       await notice.save();
 
