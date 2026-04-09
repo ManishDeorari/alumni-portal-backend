@@ -32,7 +32,7 @@ const groupSchema = new mongoose.Schema({
     },
     allowAlumniMessaging: {
         type: Boolean,
-        default: false,
+        default: true,
     },
     isAllMemberGroup: {
         type: Boolean,
