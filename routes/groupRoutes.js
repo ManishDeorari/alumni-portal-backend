@@ -56,7 +56,7 @@ router.post("/", checkAuth, checkAdmin, async (req, res) => {
             profileImagePublicId: profileImagePublicId || null,
             profileImageSettings: profileImageSettings || { x: 0, y: 0, zoom: 1, width: 100, height: 100 },
             members,
-            allowAlumniMessaging: allowAlumniMessaging !== undefined ? allowAlumniMessaging : true,
+            allowAlumniMessaging: allowAlumniMessaging !== undefined ? allowAlumniMessaging : false,
             allowFacultyMessaging: allowFacultyMessaging !== undefined ? allowFacultyMessaging : false,
             admin: req.user.id
         });
