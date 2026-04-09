@@ -48,6 +48,14 @@ router.post("/feedback", auth, async (req, res) => {
 // @access  Private
 router.get("/", auth, async (req, res) => {
     try {
+        // 🕒 Auto-cleanup: Delete read notifications older than 60 days
+        const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+        await Notification.deleteMany({ 
+            receiver: req.user._id, 
+            isRead: true, 
+            createdAt: { $lt: sixtyDaysAgo } 
+        });
+
         const notifications = await Notification.find({ receiver: req.user._id })
             .populate("sender", "name profilePicture")
             .sort({ createdAt: -1 })
@@ -69,6 +77,19 @@ router.patch("/read-all", auth, async (req, res) => {
             { isRead: true }
         );
         res.json({ message: "All notifications marked as read" });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("Server Error");
+    }
+});
+ 
+// @route   DELETE api/notifications/clear-read
+// @desc    Delete all read notifications for current user
+// @access  Private
+router.delete("/clear-read", auth, async (req, res) => {
+    try {
+        await Notification.deleteMany({ receiver: req.user._id, isRead: true });
+        res.json({ message: "Read notifications cleared successfully" });
     } catch (err) {
         console.error(err.message);
         res.status(500).send("Server Error");
