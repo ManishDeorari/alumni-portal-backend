@@ -254,10 +254,10 @@ const performDeepDelete = async (userId) => {
 
     const extractMediaInfo = (media) => {
       if (!media) return null;
-      
+
       let url = typeof media === "string" ? media : media.url;
       let public_id = typeof media === "object" ? media.public_id : null;
-      
+
       if (!url && !public_id) return null;
 
       // Determine initial guess for resource type
@@ -292,7 +292,7 @@ const performDeepDelete = async (userId) => {
     // 📝 Post Media (All types)
     const userPosts = await Post.find({ user: user._id });
     console.log(`📑 [MediaGather] Found ${userPosts.length} posts for user ${user._id}`);
-    
+
     userPosts.forEach(post => {
       let foundInPost = 0;
       (post.images || []).forEach(img => {
@@ -313,7 +313,7 @@ const performDeepDelete = async (userId) => {
     // 📅 Event Media (All types)
     const userEvents = await Event.find({ createdBy: user._id });
     console.log(`📑 [MediaGather] Found ${userEvents.length} events for user ${user._id}`);
-    
+
     userEvents.forEach(evt => {
       let foundInEvt = 0;
       (evt.images || []).forEach(img => {
@@ -334,7 +334,7 @@ const performDeepDelete = async (userId) => {
     // 💬 Group Message Media (FOR ALL USERS)
     const personalMessages = await GroupMessage.find({ sender: user._id });
     console.log(`📑 [MediaGather] Found ${personalMessages.length} group messages for user ${user._id}`);
-    
+
     personalMessages.forEach(msg => {
       if (msg.mediaUrl || msg.mediaPublicId) {
         const info = extractMediaInfo({ url: msg.mediaUrl, public_id: msg.mediaPublicId });
@@ -352,18 +352,18 @@ const performDeepDelete = async (userId) => {
 
     // === 2. EXECUTE CLOUDINARY CLEANUP (WITH MULTI-PASS FALLBACKS) ===
     const cloudinaryTypes = ["video", "image", "raw", "auto"]; // Video first as it's the priority
-    
+
     for (const item of uniqueMedia) {
       let successfullyDeleted = false;
       const fallbackRotation = [item.type, ...cloudinaryTypes.filter(t => t !== item.type)];
-      
+
       for (const resourceType of fallbackRotation) {
         try {
           const res = await cloudinary.uploader.destroy(item.id, { resource_type: resourceType });
           if (res.result === "ok") {
             console.log(`🗑  [Cloudinary] Successfully destroyed ${item.id} as ${resourceType}`);
             successfullyDeleted = true;
-            break; 
+            break;
           }
         } catch (err) {
           if (!err.message.includes("not found")) {
@@ -377,7 +377,7 @@ const performDeepDelete = async (userId) => {
     // === 3. NETWORK & CONNECTION CLEANUP ===
     // Remove references from other users' connection lists
     await User.updateMany(
-      { $or: [ { connections: user._id }, { pendingRequests: user._id }, { sentRequests: user._id } ] },
+      { $or: [{ connections: user._id }, { pendingRequests: user._id }, { sentRequests: user._id }] },
       { $pull: { connections: user._id, pendingRequests: user._id, sentRequests: user._id } }
     );
     // Delete connection documents
@@ -386,7 +386,7 @@ const performDeepDelete = async (userId) => {
     // === 4. GROUP & EVENT SYSTEM SCRUBBING ===
     // Remove from group member lists
     await Group.updateMany({ members: user._id }, { $pull: { members: user._id } });
-    
+
     // Purge event registrations
     await Registration.deleteMany({ userId: user._id });
 
@@ -404,7 +404,7 @@ const performDeepDelete = async (userId) => {
 
     // === 5. NESTED CONTENT SCRUBBING (INSIDE-OUT) ===
     console.log(`🧹 [DeepScrub] Flushing nested content (Replies -> Comments -> Winners)...`);
-    
+
     // A. POSTS: Flush Replies (Deepest level)
     await Post.updateMany(
       { "comments.replies.user": user._id },
@@ -419,8 +419,8 @@ const performDeepDelete = async (userId) => {
 
     // C. POSTS: Flush Winner Group Members (Nested)
     await Post.updateMany(
-       { "announcementDetails.winners.groupMembers": user._id },
-       { $pull: { "announcementDetails.winners.$[].groupMembers": user._id } }
+      { "announcementDetails.winners.groupMembers": user._id },
+      { $pull: { "announcementDetails.winners.$[].groupMembers": user._id } }
     );
 
     // D. POSTS: Flush Primary Winners (Parent)
@@ -492,7 +492,7 @@ router.post("/delete-users-bulk", authenticate, verifyAdmin, verifyMainAdmin, as
     const batch = userIds.slice(i, i + batchSize);
     const batchResults = await Promise.all(batch.map(async id => {
       const res = await performDeepDelete(id);
-      
+
       // 🔔 REAL-TIME LOGOUT: Notify user to disconnect immediately if deletion is successful
       if (res.success && req.io) {
         req.io.to(id).emit("forceLogout");
@@ -607,7 +607,7 @@ router.get("/export-alumni", authenticate, verifyAdmin, async (req, res) => {
     if (conditions.length > 0) {
       filter.$and = conditions;
     }
-    
+
     if (industry) filter["workProfile.industry"] = { $regex: new RegExp(industry, "i") };
 
     const users = await User.find(filter)
