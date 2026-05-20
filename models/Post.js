@@ -20,6 +20,7 @@ const commentSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   text: String,
   createdAt: { type: Date, default: Date.now },
+  isPinned: { type: Boolean, default: false },
   reactions: {
     type: Map,
     of: [mongoose.Schema.Types.ObjectId],
