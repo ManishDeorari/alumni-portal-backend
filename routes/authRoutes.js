@@ -173,7 +173,7 @@ router.post("/login", async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: "Invalid email/ID or password" });
 
-    if (!user.approved && user.role !== "admin") {
+    if (!user.approved && user.role !== "admin" && user.role !== "alumni") {
       return res.status(403).json({ message: "Your account has not been approved by admin yet." });
     }
 
