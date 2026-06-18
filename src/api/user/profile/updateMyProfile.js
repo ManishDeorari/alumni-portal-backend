@@ -87,21 +87,23 @@ module.exports = async (req, res) => {
     }).select("-password");
 
     // ✅ Award Points Logic (Strict Checklist)
-    if (updatedUser.role === "alumni" && !updatedUser.profileCompletionAwarded) {
+    if (updatedUser.role === "alumni") {
       const config = await PointsSystemConfig.findOne() || { profileCompletionPoints: 50 };
 
       const hasProfilePic = updatedUser.profilePicture && !updatedUser.profilePicture.includes("default-profile.jpg");
       const hasBanner = updatedUser.bannerImage && !updatedUser.bannerImage.includes("default_banner.jpg");
-      const hasPhone = updatedUser.phone && updatedUser.phone !== "Not provided";
+      const hasPhone = updatedUser.phone && updatedUser.phone !== "Not provided" && updatedUser.phone.replace(/\D/g, "").length >= 7;
       const hasAddress = updatedUser.address && updatedUser.address !== "Not set";
       const hasWhatsApp = updatedUser.whatsapp && updatedUser.whatsapp !== "Not linked";
       const hasLinkedIn = updatedUser.linkedin && updatedUser.linkedin !== "Not linked";
       const hasBio = updatedUser.bio && updatedUser.bio.trim().length > 0;
+      const hasSecondaryEmail = updatedUser.secondaryEmail && updatedUser.secondaryEmail.trim().length > 0;
+      const hasUniversityRollNumber = updatedUser.universityRollNumber && updatedUser.universityRollNumber.trim().length > 0;
 
       // ✅ Revised Education Logic: Mandatory 4 Levels
       const MANDATORY_DEGREES = [
         "High School (Secondary - Class 10)",
-        "Intermediate (Higher Secondary - Class 11-12)",
+        "Intermediate (Higher Secondary - Class 12)",
         "Undergraduate (Bachelor's Degree)",
         "Postgraduate (Master's Degree)"
       ];
@@ -122,9 +124,9 @@ module.exports = async (req, res) => {
         (updatedUser.jobPreferences.functionalArea || updatedUser.jobPreferences.preferredLocations?.length > 0);
 
       const isCompleted = hasProfilePic && hasBanner && hasPhone && hasAddress &&
-        hasWhatsApp && hasLinkedIn && hasBio && hasEducation;
+        hasWhatsApp && hasLinkedIn && hasBio && hasEducation && hasSecondaryEmail && hasUniversityRollNumber;
 
-      if (isCompleted) {
+      if (isCompleted && !updatedUser.profileCompletionAwarded) {
         if (!updatedUser.points) updatedUser.points = { total: 0 };
         const awardAmount = config.profileCompletionPoints || 50;
 
@@ -132,6 +134,7 @@ module.exports = async (req, res) => {
         updatedUser.points.profileCompletion = (updatedUser.points.profileCompletion || 0) + awardAmount;
 
         updatedUser.profileCompletionAwarded = true;
+        updatedUser.markModified('points');
         await updatedUser.save();
 
         // ✅ Notification for points
@@ -146,14 +149,45 @@ module.exports = async (req, res) => {
           await newNotification.save();
 
           if (req.io) {
-            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileCompletionAwarded");
             req.io.to(updatedUser._id.toString()).emit("newNotification", populatedNotification);
+            req.io.to(updatedUser._id.toString()).emit("pointsUpdated", { points: updatedUser.points });
           }
         } catch (noteErr) {
           console.error("❌ Failed to send profile completion award notice:", noteErr.message);
         }
 
         console.log(`✅ Awarded ${awardAmount} points to user ${updatedUser.name} for FULL profile completion.`);
+      } else if (!isCompleted && updatedUser.profileCompletionAwarded) {
+        // 🔴 Strict Rule: Deduct points if profile becomes incomplete
+        const awardAmount = config.profileCompletionPoints || 50;
+        
+        updatedUser.points.total = Math.max(0, (updatedUser.points.total || 0) - awardAmount);
+        updatedUser.points.profileCompletion = Math.max(0, (updatedUser.points.profileCompletion || 0) - awardAmount);
+        updatedUser.profileCompletionAwarded = false;
+        updatedUser.markModified('points');
+        await updatedUser.save();
+
+        try {
+          const Notification = require("../../../../models/Notification");
+          const newNotification = new Notification({
+            sender: updatedUser._id,
+            receiver: updatedUser._id,
+            type: "points_deducted",
+            message: `You lost ${awardAmount} points due to incomplete profile fields.`,
+          });
+          await newNotification.save();
+
+          if (req.io) {
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileCompletionAwarded");
+            req.io.to(updatedUser._id.toString()).emit("newNotification", populatedNotification);
+            req.io.to(updatedUser._id.toString()).emit("pointsUpdated", { points: updatedUser.points });
+          }
+        } catch (noteErr) {
+          console.error("❌ Failed to send profile deduction notice:", noteErr.message);
+        }
+
+        console.log(`🔴 Deducted ${awardAmount} points from user ${updatedUser.name} due to incomplete profile.`);
       }
     }
 

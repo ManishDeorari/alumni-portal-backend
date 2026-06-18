@@ -8,7 +8,7 @@ const reactToComment = async (req, res) => {
   try {
     const post = await Post.findById(postId).populate({
       path: "comments.user",
-      select: "name profilePicture"
+      select: "name profilePicture profileCompletionAwarded"
     });
     if (!post) return res.status(404).json({ msg: "Post not found" });
 
@@ -80,7 +80,7 @@ const reactToComment = async (req, res) => {
             await pointsNotification.save();
 
             if (req.io) {
-              const populatedNote = await Notification.findById(pointsNotification._id).populate("sender", "name profilePicture");
+              const populatedNote = await Notification.findById(pointsNotification._id).populate("sender", "name profilePicture profileCompletionAwarded");
               const targetRoom = user._id.toString();
               req.io.to(targetRoom).emit("newNotification", populatedNote);
               req.io.to(targetRoom).emit("liveNotification", populatedNote);
@@ -108,7 +108,7 @@ const reactToComment = async (req, res) => {
       await newNotification.save();
 
       if (req.io) {
-        const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+        const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileCompletionAwarded");
         req.io.to(commentOwnerId).emit("newNotification", populatedNotification);
         req.io.to(commentOwnerId).emit("liveNotification", populatedNotification);
       }
@@ -118,12 +118,12 @@ const reactToComment = async (req, res) => {
 
     // ✅ Fetch fully updated post with comment + reply users
     const updatedPost = await Post.findById(postId)
-      .populate("user", "name profilePicture")
+      .populate("user", "name profilePicture profileCompletionAwarded")
       .populate({
         path: "comments",
         populate: [
-          { path: "user", select: "name profilePicture" },
-          { path: "replies.user", select: "name profilePicture" },
+          { path: "user", select: "name profilePicture profileCompletionAwarded" },
+          { path: "replies.user", select: "name profilePicture profileCompletionAwarded" },
         ],
       });
 

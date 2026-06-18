@@ -11,11 +11,11 @@ const getPendingPointsRequests = async (req, res) => {
         { type: "EventRepost", "eventRepostDetails.pointsRequested": true, "eventRepostDetails.pointsStatus": "pending" }
       ]
     })
-    .populate("user", "name profilePicture")
-    .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId enrollmentNumber" })
-    .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" })
-    .populate({ path: "eventRepostDetails.originalEventId", populate: { path: "createdBy", select: "name profilePicture publicId" } })
-    .populate({ path: "announcementDetails.originalEventId", populate: { path: "createdBy", select: "name profilePicture publicId" } })
+    .populate("user", "name profilePicture profileCompletionAwarded")
+    .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture profileCompletionAwarded publicId enrollmentNumber" })
+    .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture profileCompletionAwarded" })
+    .populate({ path: "eventRepostDetails.originalEventId", populate: { path: "createdBy", select: "name profilePicture profileCompletionAwarded publicId" } })
+    .populate({ path: "announcementDetails.originalEventId", populate: { path: "createdBy", select: "name profilePicture profileCompletionAwarded publicId" } })
     .sort({ createdAt: -1 });
 
     res.json(posts);
@@ -63,7 +63,7 @@ const approvePointsRequest = async (req, res) => {
       // Emit Live Update to the affected user
       if (req.io) {
         const senderInfo = { _id: req.user._id, name: req.user.name, profilePicture: req.user.profilePicture };
-        const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+        const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileCompletionAwarded");
         req.io.to(post.user.toString()).emit("newNotification", { 
           ...populatedNotification.toObject(), 
           sender: senderInfo 
