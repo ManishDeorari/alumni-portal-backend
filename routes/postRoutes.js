@@ -67,14 +67,11 @@ router.delete("/:postId/comment/:commentId/reply/:replyId", auth, deleteReply);
 router.post("/:postId/comment/:commentId/reply/:replyId/react", auth, reactToReply);
 
 // ---------------- GET SINGLE POST (For Modal/View Full Thread) ----------------
-router.get("/:id", async (req, res) => {
+router.get("/:id", auth, async (req, res) => {
   try {
+    const postPopulateOptions = require("../src/api/posts/utils/populatePost");
     const post = await Post.findById(req.params.id)
-      .populate("user", "name profilePicture")
-      .populate({ path: "comments.user", select: "name profilePicture" })
-      .populate({ path: "comments.replies.user", select: "name profilePicture" })
-      .populate({ path: "announcementDetails.winners.userId", select: "name profilePicture publicId" })
-      .populate({ path: "announcementDetails.winners.groupMembers", select: "name profilePicture" });
+      .populate(postPopulateOptions);
 
     if (!post) return res.status(404).json({ message: "Post not found" });
 

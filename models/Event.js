@@ -21,7 +21,7 @@ const commentSchema = new mongoose.Schema({
     parentId: { type: mongoose.Schema.Types.ObjectId, ref: "Comment" },
   }],
   isPinned: { type: Boolean, default: false },
-}, { 
+}, {
   toObject: { flattenMaps: true },
   toJSON: { flattenMaps: true }
 });
@@ -58,7 +58,7 @@ const EventSchema = new mongoose.Schema({
   startTime: { type: String, required: true }, // HH:MM AM/PM
   timezone: { type: String, default: "IST" },
   endDate: { type: Date, required: true },
-  registrationCloseDate: { type: Date, required: function() { return this.eventType === 'online_registration'; } },
+  registrationCloseDate: { type: Date, required: function () { return this.eventType === 'online_registration'; } },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   registrationFields: {
     name: { type: Boolean, default: true },
@@ -86,7 +86,7 @@ const EventSchema = new mongoose.Schema({
     default: () => new Map(),
   },
   comments: [commentSchema],
-}, { 
+}, {
   timestamps: true,
   toObject: { flattenMaps: true },
   toJSON: { flattenMaps: true }
