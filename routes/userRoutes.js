@@ -1,9 +1,11 @@
+const { recordActivity } = require('../utils/activityTracker');
 const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/authMiddleware");
 const {
   getMyProfile,
   updateMyProfile,
+  endorseSkill,
   getAllUsers,
   getConnectedUsers,
   sendConnectionRequest,
@@ -21,7 +23,9 @@ const {
 // ------- PROFILE ROUTES -------
 router.get("/me", auth, getMyProfile);
 router.put("/update", auth, updateMyProfile);
+router.post("/skills/endorse/:id", auth, endorseSkill);
 router.get("/myposts", auth, getMyPosts);
+router.get("/activity", auth, getMyActivity);
 // ------- CONNECTION ROUTES -------
 router.get("/all", auth, getAllUsers);
 router.get("/top-earners", auth, getTopEarners);

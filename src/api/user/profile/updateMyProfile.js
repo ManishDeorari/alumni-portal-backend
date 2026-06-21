@@ -4,7 +4,7 @@ const cloudinary = require("../../../../config/cloudinary");
 
 module.exports = async (req, res) => {
   try {
-    const { oldImageUrl, profileImage, ...rest } = req.body;
+    const { oldImageUrl, profileImage, profileImageFocus, ...rest } = req.body;
 
     // 🧹 Delete old Cloudinary image if present & not default
     if (
@@ -48,6 +48,23 @@ module.exports = async (req, res) => {
 
     if (profileImage) {
       updates.profilePicture = profileImage;
+    }
+    if (profileImageFocus !== undefined) {
+      updates.profileImageFocus = profileImageFocus;
+    }
+
+    // ✅ Preserve endorsements when updating profileSkills
+    if (updates.profileSkills && currentUser) {
+      const existingSkills = currentUser.profileSkills || [];
+      updates.profileSkills = updates.profileSkills.map(newSkill => {
+        const existing = existingSkills.find(
+          s => s.name.toLowerCase() === newSkill.name.toLowerCase()
+        );
+        return {
+          name: newSkill.name,
+          endorsements: existing ? existing.endorsements : []
+        };
+      });
     }
 
     // ✅ Format education entries
@@ -149,7 +166,7 @@ module.exports = async (req, res) => {
           await newNotification.save();
 
           if (req.io) {
-            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileCompletionAwarded");
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileImageFocus bannerImageFocus profileCompletionAwarded");
             req.io.to(updatedUser._id.toString()).emit("newNotification", populatedNotification);
             req.io.to(updatedUser._id.toString()).emit("pointsUpdated", { points: updatedUser.points });
           }
@@ -179,7 +196,7 @@ module.exports = async (req, res) => {
           await newNotification.save();
 
           if (req.io) {
-            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileCompletionAwarded");
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileImageFocus bannerImageFocus profileCompletionAwarded");
             req.io.to(updatedUser._id.toString()).emit("newNotification", populatedNotification);
             req.io.to(updatedUser._id.toString()).emit("pointsUpdated", { points: updatedUser.points });
           }
@@ -188,6 +205,56 @@ module.exports = async (req, res) => {
         }
 
         console.log(`🔴 Deducted ${awardAmount} points from user ${updatedUser.name} due to incomplete profile.`);
+      }
+    }
+
+    // ✅ Automatic Skills Points Logic (Max 10)
+    if (updatedUser.role === "student" || updatedUser.role === "alumni") { // The user requested for both
+      const currentSkillsCount = updatedUser.profileSkills ? updatedUser.profileSkills.length : 0;
+      const newEligiblePoints = Math.min(currentSkillsCount, 10);
+      const currentAwarded = updatedUser.pointsAwardedForSkills || 0;
+      const pointsDifference = newEligiblePoints - currentAwarded;
+
+      if (pointsDifference !== 0) {
+        if (!updatedUser.points) updatedUser.points = { total: 0 };
+        
+        // Use studentEngagement or alumniParticipation based on role
+        const engagementField = updatedUser.role === "student" ? "studentEngagement" : "alumniParticipation";
+        
+        updatedUser.points.total = Math.max(0, (updatedUser.points.total || 0) + pointsDifference);
+        updatedUser.points[engagementField] = Math.max(0, (updatedUser.points[engagementField] || 0) + pointsDifference);
+        updatedUser.pointsAwardedForSkills = newEligiblePoints;
+        
+        updatedUser.markModified('points');
+        await updatedUser.save();
+
+        try {
+          const Notification = require("../../../../models/Notification");
+          const typeStr = pointsDifference > 0 ? "points_earned" : "points_deducted";
+          const actionStr = pointsDifference > 0 ? "adding skills to your profile" : "removing skills from your profile";
+          
+          const newNotification = new Notification({
+            sender: updatedUser._id,
+            receiver: updatedUser._id,
+            type: typeStr,
+            message: `You ${pointsDifference > 0 ? 'earned' : 'lost'} ${Math.abs(pointsDifference)} point(s) for ${actionStr}.`,
+          });
+          await newNotification.save();
+
+          if (req.io) {
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileImageFocus bannerImageFocus profileCompletionAwarded");
+            req.io.to(updatedUser._id.toString()).emit("newNotification", populatedNotification);
+            
+            // 🔄 Emit pointsUpdated so UI reflects it immediately
+            req.io.to(updatedUser._id.toString()).emit("pointsUpdated", {
+              awardedPoints: pointsDifference,
+              reason: pointsDifference > 0 ? "Skills Added" : "Skills Removed",
+              totalPoints: updatedUser.points.total
+            });
+          }
+        } catch (noteErr) {
+          console.error("❌ Failed to send skills points notice:", noteErr.message);
+        }
       }
     }
 

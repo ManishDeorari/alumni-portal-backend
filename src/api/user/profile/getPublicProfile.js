@@ -17,9 +17,6 @@ module.exports = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Assign the definitive object ID for internal relationship queries down the chain
-    const targetUserId = user._id;
-
     // 🚀 Visit Tracking Logic
     if (visitorId && visitorId.toString() !== targetUserId.toString()) {
       const now = new Date();
@@ -94,9 +91,29 @@ module.exports = async (req, res) => {
       await sendVisitNotification(req, visitorId, targetUserId);
     }
 
-    // ✅ Return the complete user object (already excluded password in select)
-    // We can return the whole object now since we fixed the profile fetch earlier
-    res.json(user);
+    // Convert to plain object to modify safely
+    let userData = user.toObject();
+
+    // Mutual connections calculation
+    if (visitorId && visitorId.toString() !== targetUserId.toString() && req.user && req.user.connections) {
+      const visitorConnections = req.user.connections.map(c => c.toString());
+      const targetConnections = userData.connections ? userData.connections.map(c => c.toString()) : [];
+      const mutualIds = visitorConnections.filter(id => targetConnections.includes(id));
+      
+      if (mutualIds.length > 0) {
+        // Fetch details of mutual connections
+        const mutualUsers = await User.find({ _id: { $in: mutualIds } })
+          .select("_id name profilePicture");
+        userData.mutualConnections = mutualUsers;
+      } else {
+        userData.mutualConnections = [];
+      }
+    } else {
+      userData.mutualConnections = [];
+    }
+
+    // Return the modified user object
+    res.json(userData);
   } catch (err) {
     console.error("❌ Error fetching public profile:", err.message);
     res.status(500).json({ message: "Server error" });
@@ -135,7 +152,7 @@ async function sendVisitNotification(req, visitorId, targetUserId) {
     if (req.io) {
       console.log(`📡 [Socket] Attempting to emit notification to ${targetUserId}`);
       const populatedNotification = await Notification.findById(newNotification._id)
-        .populate("sender", "name profilePicture profileCompletionAwarded");
+        .populate("sender", "name profilePicture profileImageFocus bannerImageFocus profileCompletionAwarded");
       
       const room = targetUserId.toString();
       req.io.to(room).emit("newNotification", populatedNotification);

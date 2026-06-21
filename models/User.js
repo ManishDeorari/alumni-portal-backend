@@ -66,6 +66,17 @@ const EducationSchema = new mongoose.Schema({
   description: { type: String, maxlength: 1000 },
 });
 
+const SkillSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  endorsements: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]
+});
+
+const FeaturedSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  url: { type: String, required: true },
+  type: { type: String, enum: ['github', 'youtube', 'portfolio', 'post', 'other'], default: 'other' }
+});
+
 const WorkProfileSchema = new mongoose.Schema({
   functionalArea: String,
   subFunctionalArea: String,
@@ -103,7 +114,9 @@ const UserSchema = new mongoose.Schema(
     course: String,
     year: String,
     profilePicture: String,
+    profileImageFocus: { x: Number, y: Number },
     bannerImage: String,
+    bannerImageFocus: { x: Number, y: Number },
 
     // Detailed Profile Fields
     phone: String,
@@ -113,7 +126,9 @@ const UserSchema = new mongoose.Schema(
 
     education: [EducationSchema],
     experience: [ExperienceSchema],
-    skills: [String],
+    skills: [String], // Legacy skills array
+    profileSkills: [SkillSchema], // New skills array with endorsements
+    featured: [FeaturedSchema], // Featured/pinned links
 
     workProfile: { type: WorkProfileSchema, default: {} },
     jobPreferences: { type: JobPreferencesSchema, default: {} },
@@ -122,6 +137,9 @@ const UserSchema = new mongoose.Schema(
     connections: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     pendingRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     sentRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+
+    // Activity Heatmap
+    activityHeatmap: { type: Object, default: {} },
 
     // Role & Permission
     role: {
@@ -150,6 +168,7 @@ const UserSchema = new mongoose.Schema(
     likePointLogs: [{ type: Date }], // Dates when like points were awarded
     commentPointLogs: [{ type: Date }], // Dates when comment points were awarded
     profileCompletionAwarded: { type: Boolean, default: false },
+    pointsAwardedForSkills: { type: Number, default: 0 }, // Tracks points given for skills
     eventPointsAwarded: [{ type: mongoose.Schema.Types.ObjectId, ref: "Event" }],
     lastLoginPointAwardedAt: { type: Date }, // Tracking for daily login points
 

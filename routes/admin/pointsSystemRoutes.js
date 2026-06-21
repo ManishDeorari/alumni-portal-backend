@@ -166,7 +166,7 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
             await newNotification.save();
 
             if (req.io) {
-                const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+                const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileImageFocus bannerImageFocus");
                 req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
             }
         } catch (noteErr) {
@@ -230,7 +230,7 @@ router.post("/manual-penalty", authenticate, verifyMainAdmin, async (req, res) =
             await newNotification.save();
 
             if (req.io) {
-                const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture");
+                const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileImageFocus bannerImageFocus");
                 req.io.to(user._id.toString()).emit("newNotification", populatedNotification);
                 req.io.to(user._id.toString()).emit("liveNotification", populatedNotification);
             }
