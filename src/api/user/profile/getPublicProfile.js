@@ -17,6 +17,9 @@ module.exports = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Assign the definitive object ID for internal relationship queries down the chain
+    const targetUserId = user._id;
+
     // 🚀 Visit Tracking Logic
     if (visitorId && visitorId.toString() !== targetUserId.toString()) {
       const now = new Date();
