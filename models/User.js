@@ -45,6 +45,44 @@ const ExperienceSchema = new mongoose.Schema({
   endDate: String,
   description: String,
   skills: [String],
+  isInternship: { type: Boolean, default: false },
+  proofImage: String,
+});
+
+const CertificateSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  issuer: String,
+  issueDate: String,
+  proofImage: String,
+});
+
+const ProjectSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: String,
+  startDate: String,
+  endDate: String,
+  toolsUsed: [String],
+  link: String,
+});
+
+const ResearchPaperSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  publisher: String,
+  publishDate: String,
+  description: String,
+  link: String,
+});
+
+const AchievementSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: String,
+  date: String,
+  proofImage: String,
+});
+
+const CustomLinkSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  url: { type: String, required: true },
 });
 
 const EducationSchema = new mongoose.Schema({
@@ -129,6 +167,21 @@ const UserSchema = new mongoose.Schema(
     skills: [String], // Legacy skills array
     profileSkills: [SkillSchema], // New skills array with endorsements
     featured: [FeaturedSchema], // Featured/pinned links
+    certificates: [CertificateSchema],
+    projects: [ProjectSchema],
+    researchPapers: [ResearchPaperSchema],
+    achievements: [AchievementSchema],
+    languages: [String],
+    customLinks: [CustomLinkSchema],
+    
+    // Resume and Links
+    resume: String,
+    github: String,
+    portfolio: String,
+    resumePointsStatus: { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
+    githubPointsStatus: { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
+    portfolioPointsStatus: { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
+    experiencePointsStatus: { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
 
     workProfile: { type: WorkProfileSchema, default: {} },
     jobPreferences: { type: JobPreferencesSchema, default: {} },
