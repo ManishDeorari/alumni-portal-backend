@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-// ===================== Points Schema (Alumni only) =====================
+// ===================== Points Schema (Student only) =====================
 const PointsSchema = new mongoose.Schema({
   profileCompletion: { type: Number, default: 0 },
   studentEngagement: { type: Number, default: 0 },
@@ -8,11 +8,8 @@ const PointsSchema = new mongoose.Schema({
   contentContribution: { type: Number, default: 0 },
   campusEngagement: { type: Number, default: 0 },
   innovationSupport: { type: Number, default: 0 },
-  alumniParticipation: { type: Number, default: 0 },
+  studentParticipation: { type: Number, default: 0 },
   connections: { type: Number, default: 0 },
-  posts: { type: Number, default: 0 },
-  comments: { type: Number, default: 0 },
-  replies: { type: Number, default: 0 },
   penalty: { type: Number, default: 0 },
   login: { type: Number, default: 0 },
   other: { type: Number, default: 0 },
@@ -53,6 +50,7 @@ const CertificateSchema = new mongoose.Schema({
   name: { type: String, required: true },
   issuer: String,
   issueDate: String,
+  credentialUrl: String,
   proofImage: String,
 });
 
@@ -115,22 +113,6 @@ const FeaturedSchema = new mongoose.Schema({
   type: { type: String, enum: ['github', 'youtube', 'portfolio', 'post', 'other'], default: 'other' }
 });
 
-const WorkProfileSchema = new mongoose.Schema({
-  functionalArea: String,
-  subFunctionalArea: String,
-  experience: String,
-  industry: String,
-});
-
-const JobPreferencesSchema = new mongoose.Schema({
-  functionalArea: String,
-  preferredLocations: [String],
-  noticePeriod: String,
-  salary: String,
-  resumeLink: String,
-  portfolioLink: String,
-});
-
 // ===================== Main User Schema =====================
 const UserSchema = new mongoose.Schema(
   {
@@ -140,7 +122,7 @@ const UserSchema = new mongoose.Schema(
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
 
-    // Alumni-only field
+    // Student-only field
     enrollmentNumber: { type: String, unique: true, sparse: true },
 
     // Faculty-only field
@@ -151,10 +133,17 @@ const UserSchema = new mongoose.Schema(
     job: String,
     course: String,
     year: String,
+    semester: Number,
+    section: String,
+    position: String,
+    department: String,
     profilePicture: String,
     profileImageFocus: { x: Number, y: Number },
     bannerImage: String,
     bannerImageFocus: { x: Number, y: Number },
+    secondaryEmail: String,
+    universityRollNumber: String,
+    branch: String,
 
     // Detailed Profile Fields
     phone: String,
@@ -173,18 +162,16 @@ const UserSchema = new mongoose.Schema(
     achievements: [AchievementSchema],
     languages: [String],
     customLinks: [CustomLinkSchema],
-    
+
     // Resume and Links
     resume: String,
     github: String,
     portfolio: String,
+
     resumePointsStatus: { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
     githubPointsStatus: { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
     portfolioPointsStatus: { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
     experiencePointsStatus: { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
-
-    workProfile: { type: WorkProfileSchema, default: {} },
-    jobPreferences: { type: JobPreferencesSchema, default: {} },
 
     // Networking connections
     connections: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
@@ -197,8 +184,8 @@ const UserSchema = new mongoose.Schema(
     // Role & Permission
     role: {
       type: String,
-      enum: ["alumni", "faculty", "admin"],
-      default: "alumni",
+      enum: ["student", "faculty", "admin"],
+      default: "student",
     },
     isAdmin: {
       type: Boolean,
@@ -210,18 +197,19 @@ const UserSchema = new mongoose.Schema(
     },
     isMainAdmin: { type: Boolean, default: false },
 
-    // Points (Alumni only)
+    // Points (Student only)
     points: { type: PointsSchema, default: () => ({}) },
 
-    // Last Year Points (Alumni only)
+    // Last Year Points (Student only)
     lastYearPoints: { type: LastYearPointsSchema, default: null },
 
-    // Tracking for points (Alumni only)
+    // Tracking for points (Student only)
     postPointLogs: [{ type: Date }], // Dates when post points were awarded
     likePointLogs: [{ type: Date }], // Dates when like points were awarded
     commentPointLogs: [{ type: Date }], // Dates when comment points were awarded
     profileCompletionAwarded: { type: Boolean, default: false },
     pointsAwardedForSkills: { type: Number, default: 0 }, // Tracks points given for skills
+    pointsAwardedForCertificates: { type: Number, default: 0 }, // Tracks points given for certificates
     eventPointsAwarded: [{ type: mongoose.Schema.Types.ObjectId, ref: "Event" }],
     lastLoginPointAwardedAt: { type: Date }, // Tracking for daily login points
 

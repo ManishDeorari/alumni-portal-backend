@@ -54,6 +54,26 @@ module.exports = async (req, res) => {
         }
       }
     }
+
+    // 🧹 Delete old Cloudinary certificate images if they were removed
+    if (currentUser && updates.certificates && Array.isArray(updates.certificates)) {
+      const oldProofImages = currentUser.certificates.map(e => e.proofImage).filter(img => img && img.includes("res.cloudinary.com"));
+      const newProofImages = updates.certificates.map(e => e.proofImage).filter(img => img && img.includes("res.cloudinary.com"));
+      
+      const deletedImages = oldProofImages.filter(img => !newProofImages.includes(img));
+      
+      for (const imgUrl of deletedImages) {
+        const publicId = extractPublicId(imgUrl, false);
+        if (publicId) {
+          try {
+            await cloudinary.uploader.destroy(publicId, { invalidate: true });
+            console.log(`🗑 Deleted old Cloudinary certificate proof: ${publicId}`);
+          } catch (err) {
+            console.error(`❌ Failed to delete certificate proof from Cloudinary (${publicId}):`, err);
+          }
+        }
+      }
+    }
     
     // 🔒 We no longer trust frontend pointsStatus for resume/links because it is now automated.
     delete updates.resumePointsStatus;
@@ -117,8 +137,8 @@ module.exports = async (req, res) => {
       new: true,
     }).select("-password");
 
-    // ✅ Award Points Logic (Strict Checklist)
-    if (updatedUser.role === "alumni") {
+    // ✅ Award / Deduct Points Logic (Strict Checklist)
+    if (updatedUser.role === "student") {
       const config = await PointsSystemConfig.findOne() || { profileCompletionPoints: 50 };
 
       const hasProfilePic = updatedUser.profilePicture && !updatedUser.profilePicture.includes("default-profile.jpg");
@@ -182,7 +202,12 @@ module.exports = async (req, res) => {
           if (req.io) {
             const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileImageFocus bannerImageFocus profileCompletionAwarded");
             req.io.to(updatedUser._id.toString()).emit("newNotification", populatedNotification);
-            req.io.to(updatedUser._id.toString()).emit("pointsUpdated", { points: updatedUser.points });
+            // 🔄 Emit pointsUpdated so UI reflects it immediately
+            req.io.to(updatedUser._id.toString()).emit("pointsUpdated", {
+              awardedPoints: awardAmount,
+              reason: "Profile Completion",
+              totalPoints: updatedUser.points.total
+            });
           }
         } catch (noteErr) {
           console.error("❌ Failed to send profile completion award notice:", noteErr.message);
@@ -190,11 +215,13 @@ module.exports = async (req, res) => {
 
         console.log(`✅ Awarded ${awardAmount} points to user ${updatedUser.name} for FULL profile completion.`);
       } else if (!isCompleted && updatedUser.profileCompletionAwarded) {
-        // 🔴 Strict Rule: Deduct points if profile becomes incomplete
+        // ❌ Deduct Points Logic if profile becomes incomplete
+        if (!updatedUser.points) updatedUser.points = { total: 0 };
         const awardAmount = config.profileCompletionPoints || 50;
-        
+
         updatedUser.points.total = Math.max(0, (updatedUser.points.total || 0) - awardAmount);
         updatedUser.points.profileCompletion = Math.max(0, (updatedUser.points.profileCompletion || 0) - awardAmount);
+
         updatedUser.profileCompletionAwarded = false;
         updatedUser.markModified('points');
         await updatedUser.save();
@@ -205,20 +232,26 @@ module.exports = async (req, res) => {
             sender: updatedUser._id,
             receiver: updatedUser._id,
             type: "points_deducted",
-            message: `You lost ${awardAmount} points due to incomplete profile fields.`,
+            message: `You lost ${awardAmount} points because your profile is no longer complete.`,
           });
           await newNotification.save();
 
           if (req.io) {
             const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileImageFocus bannerImageFocus profileCompletionAwarded");
             req.io.to(updatedUser._id.toString()).emit("newNotification", populatedNotification);
-            req.io.to(updatedUser._id.toString()).emit("pointsUpdated", { points: updatedUser.points });
+            
+            // 🔄 Emit pointsUpdated so UI reflects it immediately
+            req.io.to(updatedUser._id.toString()).emit("pointsUpdated", {
+              awardedPoints: -awardAmount,
+              reason: "Profile Incomplete",
+              totalPoints: updatedUser.points.total
+            });
           }
         } catch (noteErr) {
-          console.error("❌ Failed to send profile deduction notice:", noteErr.message);
+          console.error("❌ Failed to send profile completion deduction notice:", noteErr.message);
         }
 
-        console.log(`🔴 Deducted ${awardAmount} points from user ${updatedUser.name} due to incomplete profile.`);
+        console.log(`❌ Deducted ${awardAmount} points from user ${updatedUser.name} due to incomplete profile.`);
       }
     }
 
@@ -268,6 +301,53 @@ module.exports = async (req, res) => {
           }
         } catch (noteErr) {
           console.error("❌ Failed to send skills points notice:", noteErr.message);
+        }
+      }
+
+      // ✅ Automatic Certificates Points Logic (Max 10, 2 points per certificate)
+      const currentCertsCount = updatedUser.certificates ? updatedUser.certificates.length : 0;
+      const newEligibleCertPoints = Math.min(currentCertsCount * 2, 10);
+      const currentAwardedCerts = updatedUser.pointsAwardedForCertificates || 0;
+      const certPointsDifference = newEligibleCertPoints - currentAwardedCerts;
+
+      if (certPointsDifference !== 0) {
+        if (!updatedUser.points) updatedUser.points = { total: 0 };
+        
+        const engagementField = "profileCompletion"; // Grouping with profile points
+        
+        updatedUser.points.total = Math.max(0, (updatedUser.points.total || 0) + certPointsDifference);
+        updatedUser.points[engagementField] = Math.max(0, (updatedUser.points[engagementField] || 0) + certPointsDifference);
+        updatedUser.pointsAwardedForCertificates = newEligibleCertPoints;
+        
+        updatedUser.markModified('points');
+        await updatedUser.save();
+
+        try {
+          const Notification = require("../../../../models/Notification");
+          const typeStr = certPointsDifference > 0 ? "points_earned" : "points_deducted";
+          const actionStr = certPointsDifference > 0 ? "adding certificates to your profile" : "removing certificates from your profile";
+          
+          const newNotification = new Notification({
+            sender: updatedUser._id,
+            receiver: updatedUser._id,
+            type: typeStr,
+            message: `You ${certPointsDifference > 0 ? 'earned' : 'lost'} ${Math.abs(certPointsDifference)} point(s) for ${actionStr}.`,
+          });
+          await newNotification.save();
+
+          if (req.io) {
+            const populatedNotification = await Notification.findById(newNotification._id).populate("sender", "name profilePicture profileImageFocus bannerImageFocus profileCompletionAwarded");
+            req.io.to(updatedUser._id.toString()).emit("newNotification", populatedNotification);
+            
+            // 🔄 Emit pointsUpdated so UI reflects it immediately
+            req.io.to(updatedUser._id.toString()).emit("pointsUpdated", {
+              awardedPoints: certPointsDifference,
+              reason: certPointsDifference > 0 ? "Certificates Added" : "Certificates Removed",
+              totalPoints: updatedUser.points.total
+            });
+          }
+        } catch (noteErr) {
+          console.error("❌ Failed to send certificate points notice:", noteErr.message);
         }
       }
 
