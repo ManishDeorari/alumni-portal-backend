@@ -128,11 +128,11 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
                 { name: search },
                 { enrollmentNumber: search }
             ],
-            role: "alumni"
+            role: "student"
         });
 
         if (!user) {
-            return res.status(404).json({ message: "Alumni not found" });
+            return res.status(404).json({ message: "Student not found" });
         }
 
         if (!user.points) user.points = { total: 0 };
@@ -146,8 +146,7 @@ router.post("/manual-award", authenticate, verifyMainAdmin, async (req, res) => 
         const categories = [
             "profileCompletion", "studentEngagement", "referrals",
             "contentContribution", "campusEngagement", "innovationSupport",
-            "alumniParticipation", "connections", "posts", "comments",
-            "likes", "replies", "penalty", "other"
+            "studentParticipation", "alumniParticipation", "penalty", "login", "other"
         ];
 
         user.points.total = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
@@ -193,11 +192,11 @@ router.post("/manual-penalty", authenticate, verifyMainAdmin, async (req, res) =
                 { name: search },
                 { enrollmentNumber: search }
             ],
-            role: "alumni"
+            role: "student"
         });
 
         if (!user) {
-            return res.status(404).json({ message: "Alumni not found" });
+            return res.status(404).json({ message: "Student not found" });
         }
 
         if (!user.points) user.points = { total: 0 };
@@ -210,8 +209,7 @@ router.post("/manual-penalty", authenticate, verifyMainAdmin, async (req, res) =
         const categories = [
             "profileCompletion", "studentEngagement", "referrals",
             "contentContribution", "campusEngagement", "innovationSupport",
-            "alumniParticipation", "connections", "posts", "comments",
-            "likes", "replies", "penalty", "other"
+            "studentParticipation", "alumniParticipation", "penalty", "login", "other"
         ];
 
         user.points.total = categories.reduce((sum, cat) => sum + (user.points[cat] || 0), 0);
@@ -252,9 +250,9 @@ router.post("/trigger-rollover", authenticate, verifyMainAdmin, async (req, res)
         const now = new Date();
 
         const currentYear = now.getFullYear().toString();
-        const alumniUsers = await User.find({ role: "alumni" });
+        const studentUsers = await User.find({ role: "student" });
 
-        for (const user of alumniUsers) {
+        for (const user of studentUsers) {
             // Copy current points to last year
             user.lastYearPoints = {
                 year: currentYear,
@@ -269,19 +267,28 @@ router.post("/trigger-rollover", authenticate, verifyMainAdmin, async (req, res)
                 contentContribution: 0,
                 campusEngagement: 0,
                 innovationSupport: 0,
+                studentParticipation: 0,
                 alumniParticipation: 0,
-                connections: 0,
-                posts: 0,
-                comments: 0,
-                likes: 0,
-                replies: 0,
+                login: 0,
                 other: 0,
+                penalty: 0,
                 total: 0,
             };
 
             // Reset point logs
             user.postPointLogs = [];
             user.profileCompletionAwarded = false;
+            user.resumePointsStatus = "none";
+            user.githubPointsStatus = "none";
+            user.portfolioPointsStatus = "none";
+            
+            // Reset dynamic profile points
+            user.pointsAwardedForSkills = 0;
+            user.pointsAwardedForAchievements = 0;
+            user.pointsAwardedForExperience = 0;
+            user.pointsAwardedForProjects = 0;
+            user.pointsAwardedForPapers = 0;
+            user.pointsAwardedForCertificates = 0;
 
             // Re-evaluate profile completion for the new year
             const hasProfilePic = user.profilePicture && !user.profilePicture.includes("default-profile.jpg");
@@ -291,6 +298,8 @@ router.post("/trigger-rollover", authenticate, verifyMainAdmin, async (req, res)
             const hasWhatsApp = user.whatsapp && user.whatsapp !== "Not linked";
             const hasLinkedIn = user.linkedin && user.linkedin !== "Not linked";
             const hasBio = user.bio && user.bio.trim().length > 0;
+            const hasSecondaryEmail = user.secondaryEmail && user.secondaryEmail.trim().length > 0;
+            const hasUniversityRollNumber = user.universityRollNumber && user.universityRollNumber.trim().length > 0;
 
             const MANDATORY_DEGREES = [
                 "High School (Secondary - Class 10)",
@@ -308,7 +317,7 @@ router.post("/trigger-rollover", authenticate, verifyMainAdmin, async (req, res)
             const hasEducation = completedMandatoryCount >= 3;
 
             const isCompleted = hasProfilePic && hasBanner && hasPhone && hasAddress &&
-                hasWhatsApp && hasLinkedIn && hasBio && hasEducation;
+                hasWhatsApp && hasLinkedIn && hasBio && hasSecondaryEmail && hasUniversityRollNumber && hasEducation;
 
             if (isCompleted) {
                 const awardAmount = config ? (config.profileCompletionPoints || 50) : 50;
@@ -330,6 +339,28 @@ router.post("/trigger-rollover", authenticate, verifyMainAdmin, async (req, res)
                 }
             }
 
+            // Calculate dynamic profile points
+            const skillsPts = Math.min(user.profileSkills?.length || 0, 10);
+            const achievementsPts = Math.min((user.achievements?.length || 0) * 15, 45);
+            const experiencePts = Math.min((user.experience?.length || 0) * 15, 45);
+            const projectsPts = Math.min((user.projects?.length || 0) * 15, 45);
+            const papersPts = Math.min((user.papers?.length || 0) * 15, 45);
+            const certPts = Math.min((user.certificates?.length || 0) * 15, 45);
+
+            const totalDynamicPts = skillsPts + achievementsPts + experiencePts + projectsPts + papersPts + certPts;
+
+            if (totalDynamicPts > 0) {
+                user.pointsAwardedForSkills = skillsPts;
+                user.pointsAwardedForAchievements = achievementsPts;
+                user.pointsAwardedForExperience = experiencePts;
+                user.pointsAwardedForProjects = projectsPts;
+                user.pointsAwardedForPapers = papersPts;
+                user.pointsAwardedForCertificates = certPts;
+
+                user.points.total = (user.points.total || 0) + totalDynamicPts;
+                user.points.profileCompletion = (user.points.profileCompletion || 0) + totalDynamicPts;
+            }
+
             await user.save();
         }
 
@@ -338,7 +369,7 @@ router.post("/trigger-rollover", authenticate, verifyMainAdmin, async (req, res)
             await config.save();
         }
 
-        res.json({ message: "Rollover executed successfully", usersProcessed: alumniUsers.length });
+        res.json({ message: "Rollover executed successfully", usersProcessed: studentUsers.length });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Rollover failed" });
@@ -348,16 +379,16 @@ router.post("/trigger-rollover", authenticate, verifyMainAdmin, async (req, res)
 // Sync all users' points (fix discrepancies)
 router.post("/sync-points", authenticate, verifyMainAdmin, async (req, res) => {
     try {
-        const alumniUsers = await User.find({ role: "alumni" });
+        const studentUsers = await User.find({ role: "student" });
         const categories = [
             "profileCompletion", "studentEngagement", "referrals",
             "contentContribution", "campusEngagement", "innovationSupport",
-            "alumniParticipation", "connections", "posts", "comments",
+            "studentParticipation", "connections", "posts", "comments",
             "likes", "replies", "penalty", "other"
         ];
 
         let syncedCount = 0;
-        for (const user of alumniUsers) {
+        for (const user of studentUsers) {
             if (!user.points) user.points = { total: 0 };
 
             const currentTotal = user.points.total || 0;
