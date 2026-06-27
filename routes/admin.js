@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Post = require("../models/Post");
 const Group = require("../models/Group");
@@ -561,6 +562,77 @@ router.get("/leaderboard/last-year", authenticate, verifyAdmin, async (req, res)
 });
 
 // ✅ 8️⃣ Export Alumni Data (Advanced Filtering)
+router.put("/update-user/:id", authenticate, verifyAdmin, verifyMainAdmin, async (req, res) => {
+  try {
+    const { 
+      name, 
+      email, 
+      semester, 
+      course, 
+      position, 
+      department,
+      enrollmentNumber,
+      employeeId,
+      newPassword
+    } = req.body;
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (name) user.name = name;
+    if (email) user.email = email;
+
+    if (user.role === "student" || user.role === "alumni") {
+      if (semester) user.semester = semester;
+      if (course) user.course = course;
+      if (enrollmentNumber) user.enrollmentNumber = enrollmentNumber;
+    } else if (user.role === "faculty" || user.role === "admin") {
+      if (position) user.position = position;
+      if (department) user.department = department;
+      if (employeeId) user.employeeId = employeeId;
+    }
+
+    if (newPassword) {
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      if (!passwordRegex.test(newPassword)) {
+        return res.status(400).json({ message: "Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character" });
+      }
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      user.password = hashedPassword;
+    }
+
+    await user.save();
+    
+    try {
+      const notice = new Notification({
+        sender: req.user._id,
+        receiver: user._id,
+        type: "admin_notice",
+        message: "Your profile information or password has been updated by the administration.",
+      });
+      await notice.save();
+      
+      if (req.io) {
+        const populatedNote = notice.toObject();
+        populatedNote.sender = {
+          _id: req.user._id,
+          name: req.user.name,
+          profilePicture: req.user.profilePicture,
+        };
+        req.io.to(user._id.toString()).emit("newNotification", populatedNote);
+      }
+    } catch (err) {
+      console.error("Profile update notice error:", err);
+    }
+    
+    res.json({ message: "User profile updated successfully" });
+  } catch (err) {
+    console.error("Update User Error:", err);
+    res.status(500).json({ message: "Failed to update user profile" });
+  }
+});
+
+// ✅ 9️⃣ Export Alumni Data (Advanced Filtering)
 router.get("/export-alumni", authenticate, verifyAdmin, async (req, res) => {
   const { query, course, year, industry } = req.query;
 
