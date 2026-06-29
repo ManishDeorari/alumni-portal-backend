@@ -6,7 +6,7 @@ const crypto = require("crypto");
 const User = require("../models/User");
 
 const router = express.Router();
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_])[A-Za-z\d\W_]{8,}$/;
 // Enrollment number must follow format: PV-H followed by digits only (e.g. PV-H209001)
 const enrollmentNumberRegex = /^PV-H\d+$/;
 
@@ -15,10 +15,9 @@ router.post("/signup", async (req, res) => {
   try {
     let { name, email, password, enrollmentNumber, employeeId, role } = req.body;
 
-    // Normalize email domain to lowercase while preserving local part case
-    if (email && email.includes("@")) {
-      const parts = email.split("@");
-      email = parts[0] + "@" + parts[1].toLowerCase();
+    // Normalize entire email to lowercase
+    if (email) {
+      email = email.toLowerCase();
     }
 
     // Validation
@@ -150,9 +149,13 @@ router.post("/signup", async (req, res) => {
 // ======================== LOGIN ==========================
 router.post("/login", async (req, res) => {
   try {
-    const { email, password, identifier } = req.body;
+    let { email, password, identifier } = req.body;
 
-    // Email-only login — enrollment number and employee ID are no longer accepted
+    // Normalize login email/identifier to lowercase
+    if (identifier) identifier = identifier.toLowerCase();
+    if (email) email = email.toLowerCase();
+
+    // Email-only login — employee ID is no longer accepted
     const loginEmail = identifier || email;
 
     if (!loginEmail) {
@@ -257,10 +260,11 @@ const { sendOTPEmail } = require("../utils/emailService");
 // ======================== FORGOT PASSWORD (OTP) ==========================
 router.post("/forgot-password", async (req, res) => {
   try {
-    const { email } = req.body;
+    let { email } = req.body;
+    if (email) email = email.toLowerCase();
 
-    // 🛡 Security: Prevent password reset for the main admin
-    if (email && email.toLowerCase() === "manishdeorari377@gmail.com") {
+    // 🛑 Security: Prevent password reset for the main admin
+    if (email && email === "manishdeorari377@gmail.com") {
       return res.status(403).json({
         message: "Password reset is not allowed for this account via the automated system. Please contact the system developer."
       });
@@ -293,7 +297,8 @@ router.post("/forgot-password", async (req, res) => {
 // ======================== RESET PASSWORD WITH OTP ==========================
 router.post("/reset-password-with-otp", async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
+    let { email, otp, newPassword } = req.body;
+    if (email) email = email.toLowerCase();
 
     if (!email || !otp || !newPassword) {
       return res.status(400).json({ message: "All fields are required" });
