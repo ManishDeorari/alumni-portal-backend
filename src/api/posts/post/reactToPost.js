@@ -171,7 +171,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    res.status(200).json(plainPost);
+    res.status(200).json(updatedPost.toObject ? updatedPost.toObject({ flattenMaps: true }) : updatedPost);
   } catch (error) {
     console.error("🔥 Reaction error:", error.message);
     res.status(500).json({ error: "Server error" });
