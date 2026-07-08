@@ -100,7 +100,7 @@ const reactToReply = async (req, res) => {
         console.error("❌ Failed to award points", awardErr.message);
       }
     }
-    }
+    
 
     // Trigger Notification for the reply owner
     if (!isSameEmoji && replyOwnerId !== userId) {
