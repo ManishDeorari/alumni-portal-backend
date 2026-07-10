@@ -22,6 +22,7 @@ const {
   pinPost,
   incrementViews,
   tipPost,
+  getAchievementPosts,
 } = require("../src/api/posts/postController");
 
 const Post = require("../models/Post"); // Required for GET /posts/:id
@@ -29,6 +30,7 @@ const Post = require("../models/Post"); // Required for GET /posts/:id
 // ---------------- GET ALL POSTS ----------------
 router.get("/", auth, getPosts);
 router.get("/me", auth, getMyPosts);
+router.get("/achievements/:userId", auth, getAchievementPosts);
 
 // ---------------- CREATE POST ----------------
 router.post("/", auth, createPost);
@@ -57,11 +59,11 @@ router.post("/:postId/comment/:commentId/reply", auth, replyToComment);
 // ---------------- EDIT COMMENT ----------------
 router.put("/:postId/comment/:commentId", auth, editComment);
 
-// ---------------- PIN COMMENT ----------------
-router.put("/:postId/comment/:commentId/pin", auth, pinComment);
-
 // ---------------- DELETE COMMENT ----------------
 router.delete("/:postId/comment/:commentId", auth, deleteComment);
+
+// ---------------- PIN COMMENT ----------------
+router.put("/:postId/comment/:commentId/pin", auth, pinComment);
 
 router.put("/:postId/comment/:commentId/reply/:replyId", auth, editReply);
 router.delete("/:postId/comment/:commentId/reply/:replyId", auth, deleteReply);

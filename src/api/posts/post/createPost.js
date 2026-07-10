@@ -19,9 +19,9 @@ const createPost = async (req, res) => {
     // Role-based validation for post type
     let finalType = "Regular";
     if (type && type !== "Regular") {
-      if (type === "Session" && userRole === "alumni") {
+      if (type === "Session" && userRole === "student") {
         finalType = "Session";
-      } else if (type === "EventRepost" && userRole === "alumni") {
+      } else if (type === "EventRepost" && userRole === "student") {
         finalType = "EventRepost";
       } else if (type === "Event" && (userRole === "faculty" || isAdmin)) {
         finalType = "Event";
@@ -37,13 +37,15 @@ const createPost = async (req, res) => {
     if (finalType === "Announcement" && announcementDetails) {
       finalAnnouncementDetails = {
         isWinnerAnnouncement: announcementDetails.isWinnerAnnouncement || false,
+        isAchievementAnnouncement: announcementDetails.isAchievementAnnouncement || false,
+        achievementCategory: announcementDetails.achievementCategory || "",
         eventName: announcementDetails.eventName || "",
         originalEventId: announcementDetails.originalEventId || undefined,
         winners: announcementDetails.winners || [],
       };
 
-      // Search for userId by name or uniqueId for winners
-      if (finalAnnouncementDetails.isWinnerAnnouncement && finalAnnouncementDetails.winners.length > 0) {
+      // Search for userId by name or uniqueId for winners/achievers
+      if ((finalAnnouncementDetails.isWinnerAnnouncement || finalAnnouncementDetails.isAchievementAnnouncement) && finalAnnouncementDetails.winners.length > 0) {
         for (let winner of finalAnnouncementDetails.winners) {
           if (winner.uniqueId) {
             const matchedUser = await User.findOne({
@@ -125,13 +127,14 @@ const createPost = async (req, res) => {
     }
 
     // ✅ Award Points Logic
-    if (userRole === "alumni") {
+    if (finalType !== "EventRepost" && (userRole === "student" || userRole === "alumni")) {
       try {
         const user = await User.findById(req.user._id || req.user.id);
-        const config = (await PointsSystemConfig.findOne()) || { postPoints: 10, postLimitCount: 3, postLimitDays: 7 };
-
+        const PointsSystemConfig = require("../../../../models/PointsSystemConfig");
+        const config = (await PointsSystemConfig.findOne()) || { postPoints: 10, maxPostsPerDay: 5 };
+        
         const now = new Date();
-        const limitMs = (config.postLimitDays || 7) * 24 * 60 * 60 * 1000;
+        const limitMs = (config.postLimitHours || 24) * 60 * 60 * 1000;
 
         // Filter logs to find those within the limit window
         const recentLogs = (user.postPointLogs || []).filter(date => (now - new Date(date)) < limitMs);
@@ -142,9 +145,6 @@ const createPost = async (req, res) => {
           user.points.total = (user.points.total || 0) + (config.postPoints || 10);
 
           // Add to category
-          if (user.points.posts === undefined) user.points.posts = 0;
-          user.points.posts += (config.postPoints || 10);
-
           if (user.points.contentContribution === undefined) user.points.contentContribution = 0;
           user.points.contentContribution += (config.postPoints || 10);
 
