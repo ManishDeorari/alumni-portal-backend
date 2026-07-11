@@ -147,11 +147,15 @@ const approvePointsRequest = async (req, res) => {
             if (user) {
               if (!user.points) user.points = { total: 0 };
               user.points.total = (user.points.total || 0) + pointsToAward;
-              user.points.alumniParticipation = (user.points.alumniParticipation || 0) + pointsToAward;
+              
+              const isAchievement = post.announcementDetails?.isAchievementAnnouncement;
+              const category = isAchievement ? "innovationSupport" : "alumniParticipation";
+              
+              user.points[category] = (user.points[category] || 0) + pointsToAward;
               await user.save();
 
               const eventName = post.announcementDetails?.eventName || "an event";
-              const rank = winner.rank || "a winner";
+              const rank = winner.rank || winner.roleTitle || "an achiever";
 
               const newNotification = new Notification({
                 sender: req.user._id,
@@ -168,7 +172,7 @@ const approvePointsRequest = async (req, res) => {
                 req.io.to(userRoom).emit("pointsUpdated", {
                   totalPoints: user.points.total,
                   awardedPoints: pointsToAward,
-                  category: "alumniParticipation",
+                  category: category,
                   reason: `Achievement in ${eventName}`
                 });
               }
